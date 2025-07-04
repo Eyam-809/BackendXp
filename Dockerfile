@@ -1,5 +1,5 @@
 # Usa la imagen oficial de PHP con Apache y extensiones necesarias
-FROM php:8.1-apache
+FROM php:8.2-apache
 
 # Instala dependencias del sistema y extensiones de PHP necesarias
 RUN apt-get update && apt-get install -y \
