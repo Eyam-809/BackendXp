@@ -26,8 +26,8 @@ WORKDIR /var/www/html
 RUN composer install --no-dev --optimize-autoloader
 
 # Cachea configuración y rutas para producción (opcional)
-RUN php artisan config:cache
-RUN php artisan route:cache
+#RUN php artisan config:cache
+#RUN php artisan route:cache
 
 # Expone el puerto 80 para el tráfico web
 EXPOSE 80
