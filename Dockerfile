@@ -7,7 +7,8 @@ RUN apt-get update && apt-get install -y \
     unzip \
     libzip-dev \
     zip \
-    && docker-php-ext-install zip pdo pdo_pgsql pgsql
+    libpq-dev \
+ && docker-php-ext-install zip pdo pdo_pgsql pgsql
 
 # Instala Composer globalmente
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
