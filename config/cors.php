@@ -31,4 +31,11 @@ return [
 
     'supports_credentials' => false,
 
+    'paths' => ['api/*'],
+
+    'paths' => ['api/*'],
+    'allowed_origins' => ['https://backendxp-1.onrender.com'],
+
+
+
 ];
