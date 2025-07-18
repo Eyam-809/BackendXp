@@ -85,6 +85,11 @@ Route::delete('carrito/eliminar/{id}', [CarritoController::class, 'eliminarDelCa
 
 Route::get('/plan', [planesController::class, 'index']);
 
+Route::get('/test', function () {
+    return response()->json(['status' => 'ok']);
+});
+
+
 /*git add .
 git commit -m "Agrega login al frontend"
 git push origin Xp-dev
