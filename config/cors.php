@@ -34,7 +34,7 @@ return [
     'paths' => ['api/*'],
 
     'paths' => ['api/*'],
-    'allowed_origins' => ['https://backendxp-1.onrender.com'],
+    'allowed_origins' => ['https://backendxp-1.onrender.com','https://frontend-rvhf.vercel.app/'],
 
 
 
