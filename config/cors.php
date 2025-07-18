@@ -34,7 +34,11 @@ return [
     'paths' => ['api/*'],
 
     'paths' => ['api/*'],
-    'allowed_origins' => ['https://backendxp-1.onrender.com','https://frontend-rvhf.vercel.app/'],
+    'allowed_origins' => [
+    'http://localhost:3000',
+    'https://frontend-rvhf-fh94r1c3j-eduardo-villanuevas-projects-80e5e7e6.vercel.app',
+    ],
+
 
 
 
