@@ -1,7 +1,7 @@
-# Usa la imagen oficial de PHP con Apache y extensiones necesarias
+# Usa la imagen oficial de PHP con Apache
 FROM php:8.2-apache
 
-# Instala dependencias del sistema y extensiones de PHP necesarias
+# Instala extensiones necesarias
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
@@ -10,32 +10,30 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
  && docker-php-ext-install zip pdo pdo_pgsql pgsql
 
-# Instala Composer globalmente
+# Instala Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Copia los archivos del proyecto al directorio raíz del servidor Apache
+# Copia archivos del proyecto
 COPY . /var/www/html/
+
+# Cambia la raíz del documento a /public
 RUN sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available/000-default.conf
 
-# Establece permisos para almacenamiento y cache
+# Permisos
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 # Establece directorio de trabajo
 WORKDIR /var/www/html
 
-# Ejecuta composer install para instalar dependencias PHP
+# Instala dependencias
 RUN composer install --no-dev --optimize-autoloader
 
-# Cachea configuración y rutas para producción (opcional)
-#RUN php artisan config:cache
-#RUN php artisan route:cache
+# Cache opcional
+# RUN php artisan config:cache
+# RUN php artisan route:cache
 
-# Expone el puerto 80 para el tráfico web
+# Expone el puerto 80
 EXPOSE 80
 
-##Iniciamos artisan
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=$PORT"]
-
-
-# Comando para arrancar Apache en primer plano
+# Inicia Apache
 CMD ["apache2-foreground"]
