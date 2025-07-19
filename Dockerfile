@@ -33,5 +33,9 @@ RUN composer install --no-dev --optimize-autoloader
 # Expone el puerto 80 para el tráfico web
 EXPOSE 80
 
+##Iniciamos artisan
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=$PORT"]
+
+
 # Comando para arrancar Apache en primer plano
 CMD ["apache2-foreground"]
