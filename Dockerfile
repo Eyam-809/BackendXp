@@ -32,8 +32,7 @@ RUN composer install --no-dev --optimize-autoloader
 
 # Cache opcional
 # RUN php artisan config:cache
-# RUN php artisan route:cache
-
+# RUN php artisan route:cachea
 # Expone el puerto 80
 EXPOSE 80
 
