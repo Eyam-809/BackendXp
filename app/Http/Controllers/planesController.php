@@ -9,7 +9,9 @@ class planesController extends Controller
 {
     public function index() 
     {
-        $planes = Plan::all();
-        return response()->json($planes);
+       // $planes = Plan::all();
+       // return response()->json($planes);
+       return Plan::all();
+      
     }
 }
