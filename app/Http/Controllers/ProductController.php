@@ -11,9 +11,14 @@ use Illuminate\Support\Facades\Mail;
 class ProductController extends Controller
 {
     public function index()
-    {
-        return Product::all();
+{
+    try {
+        $products = Product::all();
+        return response()->json($products, 200);
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
     }
+}
     
 
 
