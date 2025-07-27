@@ -1,7 +1,7 @@
 services:
   - type: web
     name: laravel-backend
-    env: php
+    runtime: php
     region: oregon
     branch: master # cámbialo si usas "main"
     buildCommand: |
