@@ -31,27 +31,11 @@ WORKDIR /var/www/html
 # Instalar dependencias PHP con Composer
 RUN composer install --no-dev --optimize-autoloader
 
+# Limpiar caché de configuración y cache general (opcional, puede ir en runtime)
+RUN php artisan config:clear && php artisan cache:clear
+
 # Exponer el puerto 80 (Apache)
 EXPOSE 80
 
 # Comando para arrancar Apache en primer plano
 CMD ["apache2-foreground"]
-
-# Copiar el código fuente al contenedor
-COPY . /var/www/html/
-
-# Establecer permisos para storage y cache (Laravel necesita permisos de escritura)
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
-
-# Establecer el directorio de trabajo
-WORKDIR /var/www/html
-
-# Limpiar caché de configuración y cache general (por si acaso)
-RUN php artisan config:clear && php artisan cache:clear
-
-# Instalar dependencias PHP con Composer
-RUN composer install --no-dev --optimize-autoloader
-
-# Cachear la configuración para producción
-RUN php artisan config:cache
-
