@@ -1,5 +1,5 @@
-# Usamos imagen oficial PHP 8.1 con Apache
-FROM php:8.1-apache
+# Usamos imagen oficial PHP 8.2 con Apache
+FROM php:8.2-apache
 
 # Instalar dependencias del sistema y extensiones PHP necesarias para Laravel
 RUN apt-get update && apt-get install -y \
@@ -28,7 +28,7 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 # Establecer el directorio de trabajo
 WORKDIR /var/www/html
 
-# Instalar dependencias PHP con Composer (opcional, si quieres instalar al construir la imagen)
+# Instalar dependencias PHP con Composer
 RUN composer install --no-dev --optimize-autoloader
 
 # Exponer el puerto 80 (Apache)
