@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: laravel-backend
+    env: php
+    region: oregon
+    branch: master # cámbialo si usas "main"
+    buildCommand: |
+      composer install --no-dev --optimize-autoloader
+      php artisan config:cache
+      php artisan route:cache
+      php artisan key:generate
+    startCommand: php artisan serve --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_KEY
+        generateValue: true
+      - key: DB_CONNECTION
+        value: mysql
+      - key: DB_HOST
+        value: db-xpmarket.cjeggs0uu2r1.us-east-2.rds.amazonaws.com
+      - key: DB_PORT
+        value: 3306
+      - key: DB_DATABASE
+        value: examen
+      - key: DB_USERNAME
+        value: admin
+      - key: DB_PASSWORD
+        value: XpMarket2025
