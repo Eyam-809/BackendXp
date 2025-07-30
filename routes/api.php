@@ -90,6 +90,7 @@ Route::get('/test', function () {
 });
 
 Route::post('/products', [ProductController::class, 'store']);
+Route::get('/user/products', [ProductController::class, 'getUserProducts']); 
 
 
 /*git add .
