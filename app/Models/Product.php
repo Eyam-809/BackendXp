@@ -15,4 +15,9 @@ class Product extends Model
         return $this->belongsTo(User::class, 'id_user');
     }
 
+    public function getImageUrlAttribute()
+    {
+        return $this->image ? Storage::disk('public')->url($this->image) : null;
+    }
+
 }

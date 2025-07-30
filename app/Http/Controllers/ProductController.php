@@ -12,7 +12,7 @@ class ProductController extends Controller
 {
     public function index() {
     try {
-        $products = Product::all();
+        $products = Product::all()->each->append('image_url');
         return response()->json($products);
     } catch (\Exception $e) {
         return response()->json([
@@ -64,7 +64,8 @@ class ProductController extends Controller
 
     public function show($id)
     {
-        return response()->json(Product::findOrFail($id));
+        $product = Product::findOrFail($id)->append('image_url');
+        return response()->json($product);
     }
 
     public function update(Request $request, $id)
@@ -99,7 +100,7 @@ class ProductController extends Controller
 
     public function getUserProducts($id)
     {
-        $products = Product::where('id_user', $id)->get();
+        $products = Product::where('id_user', $id)->get()->each->append('image_url');
         return response()->json($products);
     }
 
