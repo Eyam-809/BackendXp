@@ -89,6 +89,8 @@ Route::get('/test', function () {
     return response()->json(['status' => 'ok']);
 });
 
+Route::post('/products', [ProductController::class, 'store']);
+
 
 /*git add .
 git commit -m "Agrega login al frontend"
