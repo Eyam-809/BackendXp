@@ -97,8 +97,10 @@ class ProductController extends Controller
 
     // Controlador ProductoController.php
 
-public function getUserProducts(Request $request) {
-    return $request->user()->products; // Relación directa si tienes definida la relación
-}
+    public function getUserProducts($id)
+    {
+        $products = Product::where('id_user', $id)->get();
+        return response()->json($products);
+    }
 
 }
