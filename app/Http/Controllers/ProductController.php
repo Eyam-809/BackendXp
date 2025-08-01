@@ -45,10 +45,21 @@ class ProductController extends Controller
 
     // Manejar la imagen si se sube una
     if ($request->hasFile('image')) {
-        $imagePath = $request->file('image')->store('products', 'public');
-        //$imagePath = $request->file('image')->public('products', 'storage');
-        $product->image = $imagePath;  // Guardar la ruta de la imagen
+        $file = $request->file('image');
+    
+        // Leer el contenido del archivo
+        $imageContents = file_get_contents($file);
+    
+        // Obtener la extensión/mime type
+        $mimeType = $file->getClientMimeType(); // ejemplo: image/jpeg
+    
+        // Codificar a base64
+        $base64Image = 'data:' . $mimeType . ';base64,' . base64_encode($imageContents);
+    
+        // Guardar en la base de datos
+        $product->image = $base64Image;
     }
+    
 
     $product->save();
 
