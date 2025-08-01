@@ -68,7 +68,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 });
 
-//Route::apiResource('products', ProductController::class);
+Route::apiResource('products', ProductController::class);
 Route::apiResource('/usuarios', UsuariosController::class);
 Route::middleware('auth:sanctum')->get('/usuario', [UsuariosController::class, 'show']);
 Route::middleware('auth:sanctum')->put('/usuario', [UsuariosController::class, 'update']);
