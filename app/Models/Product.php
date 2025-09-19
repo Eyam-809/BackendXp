@@ -20,4 +20,9 @@ class Product extends Model
         return $this->image ? Storage::disk('public')->url($this->image) : null;
     }
 
+    public function categoria()
+{
+    return $this->belongsTo(Categoria::class);
+}
+
 }

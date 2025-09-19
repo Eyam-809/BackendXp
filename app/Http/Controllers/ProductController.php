@@ -34,6 +34,7 @@ class ProductController extends Controller
         'stock' => 'required|integer',
         'image' => 'nullable|image', // Cambiado para validar que sea una imagen
         'id_user' => 'required|integer|exists:users,id',
+        
     ]);
 
     $product = new Product();
