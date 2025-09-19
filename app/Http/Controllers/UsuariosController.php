@@ -72,18 +72,32 @@ class UsuariosController extends Controller
             'email' => 'required|email',
             'telefono' => 'nullable|string',
             'direccion' => 'nullable|string',
+            'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
     
-        $usuario = auth()->user(); // Obtiene al usuario autenticado
+        $usuario = auth()->user();
     
         $usuario->name = $request->name;
         $usuario->email = $request->email;
-        $usuario->telefono = $request->telefono;  // Actualiza el teléfono
-        $usuario->direccion = $request->direccion;  // Actualiza la dirección
+        $usuario->telefono = $request->telefono;
+        $usuario->direccion = $request->direccion;
+    
+        if ($request->hasFile('imagen')) {
+            $image = $request->file('imagen');
+            $base64 = base64_encode(file_get_contents($image->getRealPath()));
+            $mime = $image->getMimeType(); // ej: image/jpeg
+    
+            $usuario->imagen = "data:$mime;base64,$base64";
+        }
+    
         $usuario->save();
     
-        return response()->json(['message' => 'Usuario actualizado']);
+        return response()->json([
+            'message' => 'Usuario actualizado',
+            'imagen_base64' => $usuario->imagen,
+        ]);
     }
+    
     
     
 
