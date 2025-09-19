@@ -11,6 +11,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\UsuariosController;
 use App\Http\Controllers\CarritoController;
 use App\Http\Controllers\planesController;
+use App\Http\Controllers\NotificacionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -91,6 +92,21 @@ Route::get('/test', function () {
 
 Route::post('/products', [ProductController::class, 'store']);
 Route::get('/products/user/{id}', [ProductController::class, 'getUserProducts']); 
+
+// Rutas para notificaciones de WhatsApp
+Route::middleware('auth:sanctum')->group(function () {
+    // Enviar oferta masiva a todos los usuarios
+    Route::post('/notificaciones/oferta-masiva', [NotificacionController::class, 'enviarOfertaMasiva']);
+    
+    // Enviar oferta a usuario específico
+    Route::post('/notificaciones/oferta-usuario/{userId}', [NotificacionController::class, 'enviarOfertaUsuario']);
+    
+    // Obtener estadísticas de WhatsApp
+    Route::get('/notificaciones/estadisticas', [NotificacionController::class, 'estadisticas']);
+    
+    // Enviar mensaje de prueba
+    Route::post('/notificaciones/prueba', [NotificacionController::class, 'enviarMensajePrueba']);
+});
 
 
 /*git add .

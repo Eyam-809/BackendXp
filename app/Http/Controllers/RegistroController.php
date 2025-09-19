@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 use App\Mail\Bienvenida;
 use Illuminate\Support\Facades\Mail;
+use App\Services\WhatsAppService;
 
 class RegistroController extends Controller
 {
@@ -49,8 +50,32 @@ class RegistroController extends Controller
             );
         }
 
+       // Enviar email de bienvenida
        Mail::to($user->email)->send(new Bienvenida($user));
 
+       // Enviar mensaje de WhatsApp de bienvenida si el usuario tiene teléfono
+       if ($user->telefono) {
+           $whatsappService = new WhatsAppService();
+           
+           // Verificar que el número de teléfono sea válido
+           if ($whatsappService->isValidPhoneNumber($user->telefono)) {
+               $whatsappResult = $whatsappService->sendWelcomeMessage($user->telefono, $user->name);
+               
+               // Log del resultado (opcional)
+               if ($whatsappResult['success']) {
+                   \Log::info('Mensaje de bienvenida enviado por WhatsApp', [
+                       'user_id' => $user->id,
+                       'phone' => $user->telefono
+                   ]);
+               } else {
+                   \Log::warning('Error al enviar mensaje de bienvenida por WhatsApp', [
+                       'user_id' => $user->id,
+                       'phone' => $user->telefono,
+                       'error' => $whatsappResult['error'] ?? 'Error desconocido'
+                   ]);
+               }
+           }
+       }
 
         return response()->json([
             'message' => 'Usuario registrado exitosamente',
