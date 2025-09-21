@@ -11,6 +11,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\UsuariosController;
 use App\Http\Controllers\CarritoController;
 use App\Http\Controllers\planesController;
+use App\Http\Controllers\CategoriaController;
 
 /*
 |--------------------------------------------------------------------------
@@ -91,6 +92,8 @@ Route::get('/test', function () {
 
 Route::post('/products', [ProductController::class, 'store']);
 Route::get('/products/user/{id}', [ProductController::class, 'getUserProducts']); 
+
+Route::apiResource('categorias', CategoriaController::class);
 
 
 /*git add .

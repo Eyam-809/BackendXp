@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\Categoria;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use App\Mail\ProductoSubido;
@@ -34,6 +35,7 @@ class ProductController extends Controller
         'stock' => 'required|integer',
         'image' => 'nullable|image', // Cambiado para validar que sea una imagen
         'id_user' => 'required|integer|exists:users,id',
+        'categoria_id' => 'nullable|integer|exists:categorias,id', // Validar categoría si se proporciona
         
     ]);
 
@@ -43,6 +45,7 @@ class ProductController extends Controller
     $product->price = $request->price;
     $product->stock = $request->stock;
     $product->id_user = $request->id_user;
+    $product->categoria_id = $request->categoria_id;
 
     // Manejar la imagen si se sube una
     if ($request->hasFile('image')) {
