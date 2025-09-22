@@ -36,6 +36,7 @@ class ProductController extends Controller
         'image' => 'nullable|image', // Cambiado para validar que sea una imagen
         'id_user' => 'required|integer|exists:users,id',
         'categoria_id' => 'nullable|integer|exists:categorias,id', // Validar categoría si se proporciona
+        'subcategoria_id' => 'nullable|integer|exists:subcategorias,id' // Validar subcategoría si se proporciona
         
     ]);
 
@@ -46,6 +47,7 @@ class ProductController extends Controller
     $product->stock = $request->stock;
     $product->id_user = $request->id_user;
     $product->categoria_id = $request->categoria_id;
+    $product->subcategoria_id = $request->subcategoria_id;
 
     // Manejar la imagen si se sube una
     if ($request->hasFile('image')) {
