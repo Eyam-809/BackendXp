@@ -20,5 +20,6 @@ class DatabaseSeeder extends Seeder
         // ]);
         $this->call(PlanesSeeder::class);
         $this->call(CategoriaSeeder::class);
+        //$this->call(SubcategoriaSeeder::class);
     }
 }

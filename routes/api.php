@@ -12,6 +12,7 @@ use App\Http\Controllers\UsuariosController;
 use App\Http\Controllers\CarritoController;
 use App\Http\Controllers\planesController;
 use App\Http\Controllers\CategoriaController;
+use App\Http\Controllers\SubcategoryController;
 
 /*
 |--------------------------------------------------------------------------
@@ -94,6 +95,9 @@ Route::post('/products', [ProductController::class, 'store']);
 Route::get('/products/user/{id}', [ProductController::class, 'getUserProducts']); 
 
 Route::apiResource('categorias', CategoriaController::class);
+
+Route::get('/subcategories/{categoria_id}', [SubcategoryController::class, 'byCategory']);
+
 
 
 /*git add .
