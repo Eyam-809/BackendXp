@@ -97,7 +97,7 @@ Route::get('/products/user/{id}', [ProductController::class, 'getUserProducts'])
 Route::apiResource('categorias', CategoriaController::class);
 
 Route::get('/subcategories/{categoria_id}', [SubcategoryController::class, 'byCategory']);
-
+Route::get('/products/subcategory/{subcategoria_id}', [ProductController::class, 'getBySubcategoria']);
 
 
 /*git add .

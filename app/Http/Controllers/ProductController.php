@@ -121,4 +121,21 @@ class ProductController extends Controller
         return response()->json($products);
     }
 
+    public function getBySubcategoria($subcategoria_id)
+    {
+        try {
+            $products = Product::where('subcategoria_id', $subcategoria_id)
+                ->get()
+                ->each->append('image_url');
+
+            return response()->json($products);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => true,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+
 }
