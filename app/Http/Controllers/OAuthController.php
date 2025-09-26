@@ -101,4 +101,40 @@ public function handleMicrosoftCallback()
 
 
 
+
+ public function redirectToGitHub()
+    {
+        // Redirige al usuario a GitHub
+         return Socialite::driver('github')->stateless()->redirect();
+    }
+
+   public function handleGitHubCallback()
+{
+    $githubUser = Socialite::driver('github')->stateless()->user();
+
+    $email = $githubUser->getEmail() ?? $githubUser->getNickname() . '@github.local';
+
+    $user = User::firstOrCreate(
+        ['email' => $email],
+        [
+            'name'        => $githubUser->getName() ?? $githubUser->getNickname(),
+            'password'    => bcrypt(Str::random(24)),
+            'provider_id' => $githubUser->getId(),
+            'provider'    => 'github',
+            'plan_id'     => 1,
+        ]
+    );
+
+    $token = $user->createToken('auth_token')->plainTextToken;
+
+    return redirect(
+        "http://localhost:3000/login/github?token={$token}&id={$user->id}&plan_id={$user->plan_id}&name=" . urlencode($user->name)
+    );
+}
+
+
+
+
+
+
 }

@@ -109,4 +109,7 @@ Route::get('login/facebook/callback', [OAuthController::class, 'handleFacebookCa
 // Rutas para OAuth con Microsoft
 Route::get('/login/microsoft', [OAuthController::class, 'redirectToMicrosoft']);
 Route::get('/login/microsoft/callback', [OAuthController::class, 'handleMicrosoftCallback']);
+// Rutas para OAuth con GitHub
+Route::get('login/github', [OAuthController::class, 'redirectToGitHub']);
+Route::get('login/github/callback', [OAuthController::class, 'handleGitHubCallback']);
 
