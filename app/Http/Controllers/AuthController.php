@@ -8,6 +8,18 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+      protected function respondWithToken(User $user)
+    {
+        return response()->json([
+            'token' => $user->createToken('auth_token')->plainTextToken,
+            'user'  => [
+                'id'    => $user->id,
+                'name'  => $user->name,
+                'email' => $user->email,
+            ]
+        ]);
+    }
+
     public function Registro(Request $request)
     {
         // Validar datos

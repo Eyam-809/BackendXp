@@ -13,6 +13,7 @@ use App\Http\Controllers\CarritoController;
 use App\Http\Controllers\planesController;
 use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\SubcategoryController;
+use App\Http\Controllers\OAuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -99,12 +100,13 @@ Route::apiResource('categorias', CategoriaController::class);
 Route::get('/subcategories/{categoria_id}', [SubcategoryController::class, 'byCategory']);
 Route::get('/products/subcategory/{subcategoria_id}', [ProductController::class, 'getBySubcategoria']);
 
-
-/*git add .
-git commit -m "Agrega login al frontend"
-git push origin Xp-dev
-*/
-
-
-
+// Rutas para OAuth con Google
+Route::get('login/google', [OAuthController::class, 'redirectToGoogle']);
+Route::get('login/google/callback', [OAuthController::class, 'handleGoogleCallback']);
+// Rutas para OAuth con Facebook
+Route::get('login/facebook', [OAuthController::class, 'redirectToFacebook']);
+Route::get('login/facebook/callback', [OAuthController::class, 'handleFacebookCallback']);
+// Rutas para OAuth con Microsoft
+Route::get('/login/microsoft', [OAuthController::class, 'redirectToMicrosoft']);
+Route::get('/login/microsoft/callback', [OAuthController::class, 'handleMicrosoftCallback']);
 
