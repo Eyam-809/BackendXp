@@ -11,76 +11,83 @@ use Illuminate\Support\Facades\Mail;
 
 class ProductController extends Controller
 {
-    public function index() {
-    try {
-        $products = Product::all()->each->append('image_url');
-        return response()->json($products);
-    } catch (\Exception $e) {
-        return response()->json([
-            'error' => true,
-            'message' => $e->getMessage()
-        ], 500);
+    public function index() 
+    {
+        try {
+            // Solo productos de tipo venta
+            $products = Product::where('tipo', 'venta')
+            ->get()
+            ->each->append('image_url');
+            
+            return response()->json($products);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => true,
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
-}
-  
-
-
 
     public function store(Request $request)
-{
-    $request->validate([
-        'name' => 'required|string|max:255',
-        'description' => 'nullable|string',
-        'price' => 'required|numeric',
-        'stock' => 'required|integer',
-        'image' => 'nullable|image', // Cambiado para validar que sea una imagen
-        'id_user' => 'required|integer|exists:users,id',
-        'categoria_id' => 'nullable|integer|exists:categorias,id', // Validar categoría si se proporciona
-        'subcategoria_id' => 'nullable|integer|exists:subcategorias,id' // Validar subcategoría si se proporciona
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'price' => 'required|numeric',
+            'stock' => 'required|integer',
+            'image' => 'nullable|image', // Cambiado para validar que sea una imagen
+            'id_user' => 'required|integer|exists:users,id',
+            'categoria_id' => 'nullable|integer|exists:categorias,id', // Validar categoría si se proporciona
+            'subcategoria_id' => 'nullable|integer|exists:subcategorias,id',// Validar subcategoría si se proporciona
+            'tipo' => 'required|string|in:venta,trueque',
+        ]);
+
+        $product = new Product();
+        $product->name = $request->name;
+        $product->description = $request->description;
+        $product->price = $request->price;
+        $product->stock = $request->stock;
+        $product->id_user = $request->id_user;
+        $product->categoria_id = $request->categoria_id;
+        $product->subcategoria_id = $request->subcategoria_id;
+        $product->tipo = $request->tipo;
+
+        // Si el tipo es 'trueque', el precio se establece en 0
+    $product->price = $request->tipo === 'trueque' ? 0 : $request->price;
+
+        // Manejar la imagen si se sube una
+        if ($request->hasFile('image')) {
+            $file = $request->file('image');
         
-    ]);
+            // Leer el contenido del archivo
+            $imageContents = file_get_contents($file);
+        
+            // Obtener la extensión/mime type
+            $mimeType = $file->getClientMimeType(); // ejemplo: image/jpeg
+        
+            // Codificar a base64
+            $base64Image = 'data:' . $mimeType . ';base64,' . base64_encode($imageContents);
+        
+            // Guardar en la base de datos
+            $product->image = $base64Image;
+        }
+        
 
-    $product = new Product();
-    $product->name = $request->name;
-    $product->description = $request->description;
-    $product->price = $request->price;
-    $product->stock = $request->stock;
-    $product->id_user = $request->id_user;
-    $product->categoria_id = $request->categoria_id;
-    $product->subcategoria_id = $request->subcategoria_id;
+        $product->save();
 
-    // Manejar la imagen si se sube una
-    if ($request->hasFile('image')) {
-        $file = $request->file('image');
-    
-        // Leer el contenido del archivo
-        $imageContents = file_get_contents($file);
-    
-        // Obtener la extensión/mime type
-        $mimeType = $file->getClientMimeType(); // ejemplo: image/jpeg
-    
-        // Codificar a base64
-        $base64Image = 'data:' . $mimeType . ';base64,' . base64_encode($imageContents);
-    
-        // Guardar en la base de datos
-        $product->image = $base64Image;
+        Mail::to($product->user->email)->send(new ProductoSubido($product));
+
+        return response()->json([
+            'message' => 'Producto creado con éxito',
+            'product' => $product
+        ], 201);
     }
-    
-
-    $product->save();
-
-     Mail::to($product->user->email)->send(new ProductoSubido($product));
-
-    return response()->json([
-        'message' => 'Producto creado con éxito',
-        'product' => $product
-    ], 201);
-}
 
 
 
     public function show($id)
     {
+
         $product = Product::findOrFail($id)->append('image_url');
         return response()->json($product);
     }
@@ -121,12 +128,30 @@ class ProductController extends Controller
         return response()->json($products);
     }
 
-    public function getBySubcategoria($subcategoria_id)
+   public function getBySubcategoria($subcategoria_id)
+{
+    try {
+        $products = Product::where('subcategoria_id', $subcategoria_id) // Solo ventas
+            ->where('tipo', 'venta')
+            ->get()
+            ->each->append('image_url');
+
+        return response()->json($products);
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => true,
+            'message' => $e->getMessage()
+        ], 500);
+    }
+}
+
+
+    public function getTrueques()
     {
         try {
-            $products = Product::where('subcategoria_id', $subcategoria_id)
-                ->get()
-                ->each->append('image_url');
+            $products = Product::where('tipo', 'trueque')
+            ->get()
+            ->each->append('image_url');
 
             return response()->json($products);
         } catch (\Exception $e) {
@@ -136,6 +161,4 @@ class ProductController extends Controller
             ], 500);
         }
     }
-
-
 }
