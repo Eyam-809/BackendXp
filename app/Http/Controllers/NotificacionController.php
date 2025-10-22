@@ -17,7 +17,7 @@ class NotificacionController extends Controller
     }
 
     /**
-     * Envía notificación de oferta a todos los usuarios con teléfono
+     * Envía notificación de oferta al número específico configurado
      *
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
@@ -35,69 +35,55 @@ class NotificacionController extends Controller
                 return response()->json(['errors' => $validator->errors()], 400);
             }
 
-            // Obtener todos los usuarios con teléfono válido
-            $usuarios = User::whereNotNull('telefono')
-                           ->where('telefono', '!=', '')
-                           ->get();
+            // Enviar oferta al número específico
+            $resultado = $this->whatsappService->sendOfferToSpecificNumber(
+                $request->titulo,
+                $request->descripcion,
+                $request->descuento
+            );
 
-            $enviados = 0;
-            $errores = 0;
-            $resultados = [];
+            if ($resultado['success']) {
+                Log::info('Oferta enviada por WhatsApp al número específico', [
+                    'offer' => $request->titulo,
+                    'target_number' => '+529992694926',
+                    'message_sid' => $resultado['message_sid']
+                ]);
 
-            foreach ($usuarios as $usuario) {
-                if ($this->whatsappService->isValidPhoneNumber($usuario->telefono)) {
-                    $resultado = $this->whatsappService->sendOfferNotification(
-                        $usuario->telefono,
-                        $request->titulo,
-                        $request->descripcion,
-                        $request->descuento
-                    );
+                return response()->json([
+                    'message' => 'Oferta enviada exitosamente al número específico',
+                    'estadisticas' => [
+                        'mensajes_enviados' => 1,
+                        'errores' => 0,
+                        'numero_destino' => '+529992694926'
+                    ],
+                    'resultado' => [
+                        'exitoso' => true,
+                        'message_sid' => $resultado['message_sid']
+                    ]
+                ], 200);
+            } else {
+                Log::warning('Error al enviar oferta por WhatsApp', [
+                    'offer' => $request->titulo,
+                    'target_number' => '+529992694926',
+                    'error' => $resultado['error'] ?? 'Error desconocido'
+                ]);
 
-                    if ($resultado['success']) {
-                        $enviados++;
-                        Log::info('Oferta enviada por WhatsApp', [
-                            'user_id' => $usuario->id,
-                            'phone' => $usuario->telefono,
-                            'offer' => $request->titulo
-                        ]);
-                    } else {
-                        $errores++;
-                        Log::warning('Error al enviar oferta por WhatsApp', [
-                            'user_id' => $usuario->id,
-                            'phone' => $usuario->telefono,
-                            'error' => $resultado['error'] ?? 'Error desconocido'
-                        ]);
-                    }
-
-                    $resultados[] = [
-                        'usuario' => $usuario->name,
-                        'telefono' => $usuario->telefono,
-                        'exitoso' => $resultado['success'],
-                        'error' => $resultado['error'] ?? null
-                    ];
-                } else {
-                    $errores++;
-                    $resultados[] = [
-                        'usuario' => $usuario->name,
-                        'telefono' => $usuario->telefono,
+                return response()->json([
+                    'message' => 'Error al enviar oferta',
+                    'estadisticas' => [
+                        'mensajes_enviados' => 0,
+                        'errores' => 1,
+                        'numero_destino' => '+529992694926'
+                    ],
+                    'resultado' => [
                         'exitoso' => false,
-                        'error' => 'Número de teléfono inválido'
-                    ];
-                }
+                        'error' => $resultado['error'] ?? 'Error desconocido'
+                    ]
+                ], 500);
             }
 
-            return response()->json([
-                'message' => 'Proceso de envío completado',
-                'estadisticas' => [
-                    'total_usuarios' => $usuarios->count(),
-                    'mensajes_enviados' => $enviados,
-                    'errores' => $errores
-                ],
-                'resultados' => $resultados
-            ], 200);
-
         } catch (\Exception $e) {
-            Log::error('Error en envío masivo de ofertas', [
+            Log::error('Error en envío de oferta', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -110,7 +96,7 @@ class NotificacionController extends Controller
     }
 
     /**
-     * Envía notificación de oferta a un usuario específico
+     * Envía notificación de oferta al número específico (mismo comportamiento que masiva)
      *
      * @param Request $request
      * @param int $userId
@@ -118,73 +104,12 @@ class NotificacionController extends Controller
      */
     public function enviarOfertaUsuario(Request $request, $userId)
     {
-        try {
-            $validator = \Validator::make($request->all(), [
-                'titulo' => 'required|string|max:255',
-                'descripcion' => 'required|string|max:1000',
-                'descuento' => 'nullable|string|max:100',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json(['errors' => $validator->errors()], 400);
-            }
-
-            $usuario = User::findOrFail($userId);
-
-            if (!$usuario->telefono) {
-                return response()->json([
-                    'error' => 'El usuario no tiene número de teléfono registrado'
-                ], 400);
-            }
-
-            if (!$this->whatsappService->isValidPhoneNumber($usuario->telefono)) {
-                return response()->json([
-                    'error' => 'El número de teléfono del usuario no es válido'
-                ], 400);
-            }
-
-            $resultado = $this->whatsappService->sendOfferNotification(
-                $usuario->telefono,
-                $request->titulo,
-                $request->descripcion,
-                $request->descuento
-            );
-
-            if ($resultado['success']) {
-                Log::info('Oferta enviada por WhatsApp a usuario específico', [
-                    'user_id' => $usuario->id,
-                    'phone' => $usuario->telefono,
-                    'offer' => $request->titulo
-                ]);
-
-                return response()->json([
-                    'message' => 'Oferta enviada exitosamente',
-                    'usuario' => $usuario->name,
-                    'telefono' => $usuario->telefono,
-                    'message_sid' => $resultado['message_sid']
-                ], 200);
-            } else {
-                return response()->json([
-                    'error' => 'Error al enviar mensaje de WhatsApp',
-                    'details' => $resultado['error']
-                ], 500);
-            }
-
-        } catch (\Exception $e) {
-            Log::error('Error al enviar oferta a usuario específico', [
-                'user_id' => $userId,
-                'error' => $e->getMessage()
-            ]);
-
-            return response()->json([
-                'error' => 'Error interno del servidor',
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        // Redirigir al método masivo ya que siempre enviamos al mismo número
+        return $this->enviarOfertaMasiva($request);
     }
 
     /**
-     * Obtiene estadísticas de usuarios con WhatsApp
+     * Obtiene estadísticas del sistema de WhatsApp
      *
      * @return \Illuminate\Http\JsonResponse
      */
@@ -192,27 +117,14 @@ class NotificacionController extends Controller
     {
         try {
             $totalUsuarios = User::count();
-            $usuariosConTelefono = User::whereNotNull('telefono')
-                                    ->where('telefono', '!=', '')
-                                    ->count();
-            
-            $usuariosValidosWhatsApp = 0;
-            $usuarios = User::whereNotNull('telefono')
-                           ->where('telefono', '!=', '')
-                           ->get();
-
-            foreach ($usuarios as $usuario) {
-                if ($this->whatsappService->isValidPhoneNumber($usuario->telefono)) {
-                    $usuariosValidosWhatsApp++;
-                }
-            }
 
             return response()->json([
                 'estadisticas' => [
                     'total_usuarios' => $totalUsuarios,
-                    'usuarios_con_telefono' => $usuariosConTelefono,
-                    'usuarios_validos_whatsapp' => $usuariosValidosWhatsApp,
-                    'porcentaje_cobertura' => $totalUsuarios > 0 ? round(($usuariosValidosWhatsApp / $totalUsuarios) * 100, 2) : 0
+                    'numero_whatsapp_remitente' => '+14155238886',
+                    'numero_whatsapp_destino' => '+529992694926',
+                    'configuracion' => 'Envío dirigido a número específico',
+                    'porcentaje_cobertura' => 100 // Siempre enviamos al número específico
                 ]
             ], 200);
 
@@ -225,7 +137,7 @@ class NotificacionController extends Controller
     }
 
     /**
-     * Envía mensaje de prueba a un número específico
+     * Envía mensaje de prueba al número específico configurado
      *
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
@@ -234,7 +146,6 @@ class NotificacionController extends Controller
     {
         try {
             $validator = \Validator::make($request->all(), [
-                'telefono' => 'required|string',
                 'mensaje' => 'required|string|max:1000',
             ]);
 
@@ -242,23 +153,18 @@ class NotificacionController extends Controller
                 return response()->json(['errors' => $validator->errors()], 400);
             }
 
-            if (!$this->whatsappService->isValidPhoneNumber($request->telefono)) {
-                return response()->json([
-                    'error' => 'Número de teléfono inválido'
-                ], 400);
-            }
-
-            $resultado = $this->whatsappService->sendMessage($request->telefono, $request->mensaje);
+            $resultado = $this->whatsappService->sendToSpecificNumber($request->mensaje);
 
             if ($resultado['success']) {
                 return response()->json([
-                    'message' => 'Mensaje enviado exitosamente',
-                    'telefono' => $request->telefono,
+                    'message' => 'Mensaje de prueba enviado exitosamente',
+                    'telefono_destino' => '+529992694926',
+                    'telefono_remitente' => '+14155238886',
                     'message_sid' => $resultado['message_sid']
                 ], 200);
             } else {
                 return response()->json([
-                    'error' => 'Error al enviar mensaje',
+                    'error' => 'Error al enviar mensaje de prueba',
                     'details' => $resultado['error']
                 ], 500);
             }
@@ -271,3 +177,4 @@ class NotificacionController extends Controller
         }
     }
 }
+

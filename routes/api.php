@@ -12,6 +12,8 @@ use App\Http\Controllers\UsuariosController;
 use App\Http\Controllers\CarritoController;
 use App\Http\Controllers\planesController;
 use App\Http\Controllers\NotificacionController;
+use App\Http\Controllers\SMSController;
+use App\Http\Controllers\PointsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -48,6 +50,15 @@ function verificarVigenciaPlan($user) {
 
 
 Route::post('/registros', [RegistroController::class, 'registrar']);
+
+// Rutas para verificación por SMS
+Route::post('/verificacion/enviar-codigo', [RegistroController::class, 'enviarCodigoVerificacion']);
+Route::post('/verificacion/verificar-codigo', [RegistroController::class, 'verificarCodigo']);
+
+// Rutas para SMS
+Route::post('/sms/bienvenida', [SMSController::class, 'enviarSMSBienvenida']);
+Route::post('/sms/prueba', [SMSController::class, 'enviarSMSPrueba']);
+Route::post('/sms/analisis', [SMSController::class, 'analizarSMS']);
 
 
 Route::post('login', function (Request $request) {
@@ -90,6 +101,11 @@ Route::get('/test', function () {
     return response()->json(['status' => 'ok']);
 });
 
+// Ruta de prueba para puntos (sin autenticación)
+Route::get('/points/test', function () {
+    return response()->json(['message' => 'Puntos API funcionando']);
+});
+
 Route::post('/products', [ProductController::class, 'store']);
 Route::get('/products/user/{id}', [ProductController::class, 'getUserProducts']); 
 
@@ -106,6 +122,14 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Enviar mensaje de prueba
     Route::post('/notificaciones/prueba', [NotificacionController::class, 'enviarMensajePrueba']);
+});
+
+// Rutas para el sistema de puntos
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/points/{userId}', [PointsController::class, 'getUserPoints']);
+    Route::get('/points/{userId}/history', [PointsController::class, 'getPointsHistory']);
+    Route::post('/points/add', [PointsController::class, 'addPointsFromPurchase']);
+    Route::post('/points/redeem', [PointsController::class, 'redeemReward']);
 });
 
 
