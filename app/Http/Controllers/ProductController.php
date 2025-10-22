@@ -150,6 +150,7 @@ class ProductController extends Controller
     {
         try {
             $products = Product::where('tipo', 'trueque')
+            ->with('user:id,name,email')
             ->get()
             ->each->append('image_url');
 

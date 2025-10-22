@@ -12,6 +12,9 @@ use App\Http\Controllers\planesController;
 use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\SubcategoryController;
 use App\Http\Controllers\OAuthController;
+use App\Http\Controllers\ConversationController;
+use App\Http\Controllers\MessageController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -61,6 +64,16 @@ Route::middleware('auth:sanctum')->group(function () {
     // Perfil usuario
     Route::get('/usuario', [UsuariosController::class, 'show']);
     Route::put('/usuario', [UsuariosController::class, 'update']);
+    Route::post('/usuario/foto', [UsuariosController::class, 'updateFoto']);
+
+    // Conversaciones
+    Route::get('/conversations', [ConversationController::class, 'index']);
+    Route::post('/conversations', [ConversationController::class, 'store']);
+    Route::get('/conversations/user/{id}', [ConversationController::class, 'getByUser']);
+    Route::post('/conversations/{conversation}/read', [ConversationController::class, 'markAsRead']);
+    // Mensajes
+    Route::get('/conversations/{id}/messages', [MessageController::class, 'index']);
+    Route::post('/conversations/{id}/messages', [MessageController::class, 'store']);
 
     // Productos del usuario autenticado
     Route::get('/user/products', [ProductController::class, 'getUserProducts']);
