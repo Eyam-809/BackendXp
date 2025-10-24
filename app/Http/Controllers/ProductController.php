@@ -40,6 +40,7 @@ class ProductController extends Controller
             'categoria_id' => 'nullable|integer|exists:categorias,id', // Validar categoría si se proporciona
             'subcategoria_id' => 'nullable|integer|exists:subcategorias,id',// Validar subcategoría si se proporciona
             'tipo' => 'required|string|in:venta,trueque',
+            'video' => 'nullable|file|mimes:mp4,mov,avi|max:51200',
         ]);
 
         $product = new Product();
@@ -51,6 +52,12 @@ class ProductController extends Controller
         $product->categoria_id = $request->categoria_id;
         $product->subcategoria_id = $request->subcategoria_id;
         $product->tipo = $request->tipo;
+        
+        if ($request->hasFile('video')) {
+        $path = $request->file('video')->store('videos', 's3'); // Carpeta 'videos' en S3
+        Storage::disk('s3')->setVisibility($path, 'public'); // Hacerlo público
+        $product->video = Storage::disk('s3')->url($path); // Guardar la URL en DB
+         }
 
         // Si el tipo es 'trueque', el precio se establece en 0
     $product->price = $request->tipo === 'trueque' ? 0 : $request->price;
