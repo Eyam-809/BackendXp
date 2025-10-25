@@ -14,7 +14,9 @@ use App\Http\Controllers\SubcategoryController;
 use App\Http\Controllers\OAuthController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\MessageController;
-
+use App\Http\Controllers\NotificacionController;
+use App\Http\Controllers\SMSController;
+use App\Http\Controllers\PointsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -24,7 +26,18 @@ use App\Http\Controllers\MessageController;
 
 // Rutas públicas
 Route::post('/registros', [RegistroController::class, 'registrar']);
-Route::post('/login', function (Request $request) {
+
+// Rutas para verificación por SMS
+Route::post('/verificacion/enviar-codigo', [RegistroController::class, 'enviarCodigoVerificacion']);
+Route::post('/verificacion/verificar-codigo', [RegistroController::class, 'verificarCodigo']);
+
+// Rutas para SMS
+Route::post('/sms/bienvenida', [SMSController::class, 'enviarSMSBienvenida']);
+Route::post('/sms/prueba', [SMSController::class, 'enviarSMSPrueba']);
+Route::post('/sms/analisis', [SMSController::class, 'analizarSMS']);
+
+
+Route::post('login', function (Request $request) {
     $credentials = $request->only('email', 'password');
 
     if (Auth::attempt($credentials)) {
@@ -96,3 +109,39 @@ Route::get('/plan', [planesController::class, 'index']);
 Route::get('/test', function () {
     return response()->json(['status' => 'ok']);
 });
+
+// Ruta de prueba para puntos (sin autenticación)
+Route::get('/points/test', function () {
+    return response()->json(['message' => 'Puntos API funcionando']);
+});
+
+Route::post('/products', [ProductController::class, 'store']);
+Route::get('/products/user/{id}', [ProductController::class, 'getUserProducts']); 
+
+// Rutas para notificaciones de WhatsApp
+Route::middleware('auth:sanctum')->group(function () {
+    // Enviar oferta masiva a todos los usuarios
+    Route::post('/notificaciones/oferta-masiva', [NotificacionController::class, 'enviarOfertaMasiva']);
+    
+    // Enviar oferta a usuario específico
+    Route::post('/notificaciones/oferta-usuario/{userId}', [NotificacionController::class, 'enviarOfertaUsuario']);
+    
+    // Obtener estadísticas de WhatsApp
+    Route::get('/notificaciones/estadisticas', [NotificacionController::class, 'estadisticas']);
+    
+    // Enviar mensaje de prueba
+    Route::post('/notificaciones/prueba', [NotificacionController::class, 'enviarMensajePrueba']);
+});
+
+// Rutas para el sistema de puntos
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/points/{userId}', [PointsController::class, 'getUserPoints']);
+    Route::get('/points/{userId}/history', [PointsController::class, 'getPointsHistory']);
+    Route::post('/points/add', [PointsController::class, 'addPointsFromPurchase']);
+    Route::post('/points/redeem', [PointsController::class, 'redeemReward']);
+});
+
+
+
+
+
