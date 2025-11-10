@@ -26,6 +26,7 @@ class User extends Authenticatable
         'telefono', 
         'direccion',
         'plan_id',
+        'foto',
     ];
 
     /**
