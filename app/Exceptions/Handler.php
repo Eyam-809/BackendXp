@@ -27,4 +27,16 @@ class Handler extends ExceptionHandler
             //
         });
     }
+    
+    public function render($request, Throwable $exception)
+{
+    if ($request->is('api/*')) {
+        return response()->json([
+            'message' => $exception->getMessage()
+        ], method_exists($exception, 'getStatusCode') ? $exception->getStatusCode() : 400);
+    }
+
+    return parent::render($request, $exception);
+}
+
 }

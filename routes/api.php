@@ -17,6 +17,9 @@ use App\Http\Controllers\MessageController;
 use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\SMSController;
 use App\Http\Controllers\PointsController;
+use App\Http\Controllers\CompraController;
+use App\Http\Controllers\DetalleCompraController;
+use App\Http\Controllers\PedidoController;
 
 /*
 |--------------------------------------------------------------------------
@@ -78,6 +81,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/usuario', [UsuariosController::class, 'show']);
     Route::put('/usuario', [UsuariosController::class, 'update']);
     Route::post('/usuario/foto', [UsuariosController::class, 'updateFoto']);
+    Route::post('/user/change-password', [\App\Http\Controllers\UsuariosController::class, 'cambiarPassword']);
 
     // Conversaciones
     Route::get('/conversations', [ConversationController::class, 'index']);
@@ -92,7 +96,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/products', [ProductController::class, 'getUserProducts']);
 
     // Crear, actualizar y eliminar productos
-    Route::post('/products', [ProductController::class, 'store']);
+    //Route::post('/products', [ProductController::class, 'store']);
     Route::put('/products/{id}', [ProductController::class, 'update']);
     Route::delete('/products/{id}', [ProductController::class, 'destroy']);
 
@@ -100,6 +104,29 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/carrito/agregar', [CarritoController::class, 'agregarAlCarrito']);
     Route::get('/carrito', [CarritoController::class, 'verCarrito']);
     Route::delete('/carrito/eliminar/{id}', [CarritoController::class, 'eliminarDelCarrito']);
+
+    // Compras
+    Route::post('/compras', [CompraController::class, 'store']);
+    Route::get('/compras', [CompraController::class, 'index']); // Ver todas las compras (admin)
+    Route::get('/compras/{id}', [CompraController::class, 'show']);
+    Route::put('/compras/{id}/actualizar-estado', [CompraController::class, 'actualizarEstado']);
+    Route::put('/compras/{id}', [CompraController::class, 'update']);
+    Route::delete('/compras/{id}', [CompraController::class, 'destroy']);
+    Route::get('/compras/usuario/{userId}', [CompraController::class, 'getByUser']);
+
+    // Pedidos
+    Route::get('/pedidos', [PedidoController::class, 'index']);
+    Route::get('/pedidos/{id}', [PedidoController::class, 'show']);
+    Route::put('/pedidos/{id}/actualizar-estado', [PedidoController::class, 'updateEstado']);
+    Route::delete('/pedidos/{id}', [PedidoController::class, 'destroy']);
+    Route::get('/pedidos/usuario/{userId}', [PedidoController::class, 'getByUser']);
+
+    // Detalle de compras
+    Route::get('/detalle-compras', [DetalleCompraController::class, 'index']);
+    Route::get('/detalle-compras/{id}', [DetalleCompraController::class, 'show']);
+    Route::post('/detalle-compras', [DetalleCompraController::class, 'store']);
+    Route::put('/detalle-compras/{id}', [DetalleCompraController::class, 'update']);
+    Route::delete('/detalle-compras/{id}', [DetalleCompraController::class, 'destroy']);
 });
 
 // Planes
@@ -139,9 +166,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/points/{userId}/history', [PointsController::class, 'getPointsHistory']);
     Route::post('/points/add', [PointsController::class, 'addPointsFromPurchase']);
     Route::post('/points/redeem', [PointsController::class, 'redeemReward']);
+    
 });
 
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/products', [ProductController::class, 'store']);
+});
 
-
-
+Route::get('/products/{id}', [ProductController::class, 'show']);
 

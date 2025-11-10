@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
-use App\Models\Categoria;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use App\Mail\ProductoSubido;
@@ -11,161 +10,227 @@ use Illuminate\Support\Facades\Mail;
 
 class ProductController extends Controller
 {
-    public function index() 
+    // 🔹 Obtener todos los productos tipo "venta"
+    public function index()
     {
         try {
-            // Solo productos de tipo venta
             $products = Product::where('tipo', 'venta')
-            ->get()
-            ->each->append('image_url');
-            
+                ->get()
+                ->each->append('image_url');
+
             return response()->json($products);
         } catch (\Exception $e) {
             return response()->json([
                 'error' => true,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
 
+    // 🔹 Crear un nuevo producto
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric',
-            'stock' => 'required|integer',
-            'image' => 'nullable|image', // Cambiado para validar que sea una imagen
-            'id_user' => 'required|integer|exists:users,id',
-            'categoria_id' => 'nullable|integer|exists:categorias,id', // Validar categoría si se proporciona
-            'subcategoria_id' => 'nullable|integer|exists:subcategorias,id',// Validar subcategoría si se proporciona
-            'tipo' => 'required|string|in:venta,trueque',
-            'video' => 'nullable|file|mimes:mp4,mov,avi|max:51200',
+            'name'            => 'required|string|max:255',
+            'description'     => 'nullable|string',
+            'price'           => 'required|numeric',
+            'stock'           => 'required|integer',
+            'image'           => 'nullable|image|max:2048',
+            'id_user'         => 'required|integer|exists:users,id',
+            'categoria_id'    => 'nullable|integer|exists:categorias,id',
+            'subcategoria_id' => 'nullable|integer|exists:subcategorias,id',
+            'tipo'            => 'required|string|in:venta,trueque',
+            'video'           => 'nullable|file|mimes:mp4,mov,avi|max:51200', // 50MB máx
         ]);
 
         $product = new Product();
-        $product->name = $request->name;
-        $product->description = $request->description;
-        $product->price = $request->price;
-        $product->stock = $request->stock;
-        $product->id_user = $request->id_user;
-        $product->categoria_id = $request->categoria_id;
-        $product->subcategoria_id = $request->subcategoria_id;
-        $product->tipo = $request->tipo;
-        
+        $product->fill($request->only([
+            'name', 'description', 'price', 'stock',
+            'id_user', 'categoria_id', 'subcategoria_id', 'tipo'
+        ]));
+
+        // 🔸 Si el tipo es "trueque", el precio se pone a 0
+        if ($request->tipo === 'trueque') {
+            $product->price = 0;
+        }
+
+        // 🔸 Subir video a S3 si se incluye (con fallback a base64 si S3 falla)
         if ($request->hasFile('video')) {
-        $path = $request->file('video')->store('videos', 's3'); // Carpeta 'videos' en S3
-        Storage::disk('s3')->setVisibility($path, 'public'); // Hacerlo público
-        $product->video = Storage::disk('s3')->url($path); // Guardar la URL en DB
-         }
+            $file = $request->file('video');
+            $mimeType = $file->getClientMimeType();
 
-        // Si el tipo es 'trueque', el precio se establece en 0
-    $product->price = $request->tipo === 'trueque' ? 0 : $request->price;
+            // S3 deshabilitado temporalmente — se conserva el código comentado para usar luego.
+            /*
+            try {
+                // Intentar subir a S3
+                $path = $file->store('videos', 's3');
+                Storage::disk('s3')->setVisibility($path, 'public');
+                $product->video = Storage::disk('s3')->url($path);
+            } catch (\Throwable $e) {
+                // Si falla S3, se registra (pero no guardamos aquí)
+                \Log::warning('S3 upload failed', ['error' => $e->getMessage()]);
+            }
+            */
 
-        // Manejar la imagen si se sube una
+            // Guardar siempre como base64 en la BD (fallback permanente mientras S3 no se use)
+            $contents = file_get_contents($file->getRealPath());
+            $product->video = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
+            \Log::info('Video guardado en base64 (S3 deshabilitado)', ['size' => strlen($product->video)]);
+        }
+
+        // 🔸 Guardar imagen en base64 (sin usar disco)
         if ($request->hasFile('image')) {
             $file = $request->file('image');
-        
-            // Leer el contenido del archivo
+            $mimeType = $file->getClientMimeType();
             $imageContents = file_get_contents($file);
-        
-            // Obtener la extensión/mime type
-            $mimeType = $file->getClientMimeType(); // ejemplo: image/jpeg
-        
-            // Codificar a base64
-            $base64Image = 'data:' . $mimeType . ';base64,' . base64_encode($imageContents);
-        
-            // Guardar en la base de datos
-            $product->image = $base64Image;
+            $product->image = 'data:' . $mimeType . ';base64,' . base64_encode($imageContents);
         }
-        
 
         $product->save();
 
-        Mail::to($product->user->email)->send(new ProductoSubido($product));
+        // 🔸 Enviar correo al usuario
+        if ($product->user && $product->user->email) {
+            Mail::to($product->user->email)->send(new ProductoSubido($product));
+        }
 
         return response()->json([
             'message' => 'Producto creado con éxito',
-            'product' => $product
+            'product' => $product,
         ], 201);
     }
 
-
-
+    // 🔹 Mostrar producto por ID
     public function show($id)
     {
-
         $product = Product::findOrFail($id)->append('image_url');
         return response()->json($product);
     }
 
+    // 🔹 Actualizar producto
     public function update(Request $request, $id)
     {
         $product = Product::findOrFail($id);
-        
-        // Procesar la imagen si se envía una nueva
-        if ($request->has('image')) {
-            $imageData = $request->input('image');
-            $image = str_replace('data:image/jpeg;base64,', '', $imageData);
-            $image = str_replace(' ', '+', $image);
-            $imageName = time() . '.jpg';
-            Storage::disk('public')->put($imageName, base64_decode($image));
-            $request->merge(['image' => $imageName]);
+
+        $request->validate([
+            'name'        => 'sometimes|string|max:255',
+            'description' => 'nullable|string',
+            'price'       => 'sometimes|numeric',
+            'stock'       => 'sometimes|integer',
+            'tipo'        => 'sometimes|string|in:venta,trueque',
+            'image'       => 'nullable|image|max:2048',
+            'video'       => 'nullable|file|mimes:mp4,mov,avi|max:51200',
+        ]);
+
+        // 🔸 Subir nuevo video si se actualiza (con fallback a base64)
+        if ($request->hasFile('video')) {
+            $file = $request->file('video');
+            $mimeType = $file->getClientMimeType();
+
+            // Eliminación en S3 deshabilitada (no borrar nada si guardas en base64)
+            /*
+            if ($product->video && (str_starts_with($product->video, 'http://') || str_starts_with($product->video, 'https://'))) {
+                try {
+                    $oldPath = parse_url($product->video, PHP_URL_PATH);
+                    $oldPath = ltrim($oldPath, '/');
+                    Storage::disk('s3')->delete($oldPath);
+                } catch (\Throwable $e) {
+                    \Log::warning('No se pudo eliminar video anterior en S3', ['error' => $e->getMessage()]);
+                }
+            }
+            */
+
+            // S3 upload deshabilitado — guardar en base64
+            /*
+            try {
+                $path = $file->store('videos', 's3');
+                Storage::disk('s3')->setVisibility($path, 'public');
+                $product->video = Storage::disk('s3')->url($path);
+            } catch (\Throwable $e) {
+                \Log::warning('S3 upload failed on update', ['error' => $e->getMessage()]);
+            }
+            */
+            $contents = file_get_contents($file->getRealPath());
+            $product->video = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
+            \Log::info('Video actualizado y guardado en base64 (S3 deshabilitado)', ['size' => strlen($product->video)]);
         }
 
-        $product->update($request->all());
-        return response()->json($product);
+        // 🔸 Subir nueva imagen si se envía
+        if ($request->hasFile('image')) {
+            $file = $request->file('image');
+            $mimeType = $file->getClientMimeType();
+            $imageContents = file_get_contents($file);
+            $product->image = 'data:' . $mimeType . ';base64,' . base64_encode($imageContents);
+        }
+
+        $product->fill($request->except(['video', 'image']));
+        $product->save();
+
+        return response()->json([
+            'message' => 'Producto actualizado correctamente',
+            'product' => $product,
+        ]);
     }
 
+    // 🔹 Eliminar producto
     public function destroy($id)
     {
         $product = Product::findOrFail($id);
-        if ($product->image) {
-            Storage::disk('public')->delete($product->image); // Eliminar la imagen si existe
+
+        // Eliminación en S3 deshabilitada — no intentaremos borrar nada remoto.
+        /*
+        if ($product->video) {
+            $oldPath = parse_url($product->video, PHP_URL_PATH);
+            Storage::disk('s3')->delete($oldPath);
         }
+        */
+
         $product->delete();
-        return response()->json(['message' => 'Producto eliminado']);
+
+        return response()->json(['message' => 'Producto eliminado correctamente']);
     }
 
-    // Controlador ProductoController.php
-
+    // 🔹 Obtener productos por usuario
     public function getUserProducts($id)
     {
-        $products = Product::where('id_user', $id)->get()->each->append('image_url');
-        return response()->json($products);
-    }
-
-   public function getBySubcategoria($subcategoria_id)
-{
-    try {
-        $products = Product::where('subcategoria_id', $subcategoria_id) // Solo ventas
-            ->where('tipo', 'venta')
+        $products = Product::where('id_user', $id)
             ->get()
             ->each->append('image_url');
 
         return response()->json($products);
-    } catch (\Exception $e) {
-        return response()->json([
-            'error' => true,
-            'message' => $e->getMessage()
-        ], 500);
     }
-}
 
-
-    public function getTrueques()
+    // 🔹 Obtener productos por subcategoría
+    public function getBySubcategoria($subcategoria_id)
     {
         try {
-            $products = Product::where('tipo', 'trueque')
-            ->with('user:id,name,email')
-            ->get()
-            ->each->append('image_url');
+            $products = Product::where('subcategoria_id', $subcategoria_id)
+                ->where('tipo', 'venta')
+                ->get()
+                ->each->append('image_url');
 
             return response()->json($products);
         } catch (\Exception $e) {
             return response()->json([
                 'error' => true,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    // 🔹 Obtener productos tipo trueque
+    public function getTrueques()
+    {
+        try {
+            $products = Product::where('tipo', 'trueque')
+                ->with('user:id,name,email')
+                ->get()
+                ->each->append('image_url');
+
+            return response()->json($products);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => true,
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
