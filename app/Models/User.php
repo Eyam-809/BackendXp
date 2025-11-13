@@ -54,14 +54,22 @@ class User extends Authenticatable
     }
 
     public function plan()
-{
-    return $this->belongsTo(Plan::class);
-}
+    {
+        return $this->belongsTo(Plan::class);
+    }
 
-public function planVigencia()
-{
-    return $this->hasOne(PlanVigencia::class);
-}
+    public function planVigencia()
+    {
+        return $this->hasOne(PlanVigencia::class);
+    }
 
-    
+    public function paymentCards()
+    {
+        return $this->hasMany(\App\Models\PaymentCard::class, 'user_id');
+    }
+
+    public function direcciones()
+    {
+        return $this->hasMany(Direccion::class, 'user_id'); 
+    }
 }
