@@ -9,7 +9,11 @@ use Illuminate\Support\Facades\Storage;
 class Product extends Model
 {
     use HasFactory;
-    protected $fillable = ['name', 'description', 'price', 'stock', 'image', 'id_user'];
+    protected $fillable = [
+        'name','description','price','stock',
+        'id_user','categoria_id','subcategoria_id','tipo',
+        'image','video','status_id'
+    ];
 
     public function user() {
         return $this->belongsTo(User::class, 'id_user');
@@ -30,6 +34,9 @@ class Product extends Model
         return $this->belongsTo(Subcategoria::class);
     }
 
-    
+    public function status()
+    {
+        return $this->belongsTo(Status::class);
+    }
 
 }

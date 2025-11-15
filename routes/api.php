@@ -67,6 +67,7 @@ Route::get('/products', [ProductController::class, 'index']); // Todos los produ
 Route::get('/products/trueques', [ProductController::class, 'getTrueques']); // Solo trueques
 Route::get('/products/subcategory/{subcategoria_id}', [ProductController::class, 'getBySubcategoria']); // Por subcategoría
 Route::get('/products/user/{id}', [ProductController::class, 'getUserProducts']); // Por usuario
+Route::get('/products/active/{userId}/count', [ProductController::class, 'getActiveProducts']);
 
 // Categorías y subcategorías
 Route::apiResource('categorias', CategoriaController::class);
@@ -99,6 +100,7 @@ Route::middleware('auth:sanctum')->group(function () {
     //Route::post('/products', [ProductController::class, 'store']);
     Route::put('/products/{id}', [ProductController::class, 'update']);
     Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+    //Route::get('/products/status/{status_id}', [ProductController::class, 'getByStatus']);
 
     // Carrito
     Route::post('/carrito/agregar', [CarritoController::class, 'agregarAlCarrito']);
@@ -113,6 +115,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/compras/{id}', [CompraController::class, 'update']);
     Route::delete('/compras/{id}', [CompraController::class, 'destroy']);
     Route::get('/compras/usuario/{userId}', [CompraController::class, 'getByUser']);
+    Route::get('/compras/user/{userId}/count', [CompraController::class, 'countByUser']);
 
     // Pedidos
     Route::get('/pedidos', [PedidoController::class, 'index']);
@@ -175,3 +178,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::get('/products/{id}', [ProductController::class, 'show']);
 
+//Prueba de estatus
+Route::get('/products/status/{status_id}', [ProductController::class, 'getByStatus']);
+Route::post('/compras/compraplan', [CompraController::class, 'storeSubscription']);
+
+// Ruta para contar productos vendidos por usuario
+Route::get('/products/user/{userId}/sold-count', [ProductController::class, 'countSoldByUser']);
