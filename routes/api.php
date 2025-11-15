@@ -109,9 +109,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/carrito', [CarritoController::class, 'verCarrito']);
     Route::delete('/carrito/eliminar/{id}', [CarritoController::class, 'eliminarDelCarrito']);
 
-    // Compras
+    // Compras - CON SISTEMA DE PUNTOS
     Route::post('/compras', [CompraController::class, 'store']);
-    Route::get('/compras', [CompraController::class, 'index']); // Ver todas las compras (admin)
+    Route::get('/compras', [CompraController::class, 'index']);
     Route::get('/compras/{id}', [CompraController::class, 'show']);
     Route::put('/compras/{id}/actualizar-estado', [CompraController::class, 'actualizarEstado']);
     Route::put('/compras/{id}', [CompraController::class, 'update']);
@@ -170,6 +170,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/points/{userId}/history', [PointsController::class, 'getPointsHistory']);
     Route::post('/points/add', [PointsController::class, 'addPointsFromPurchase']);
     Route::post('/points/redeem', [PointsController::class, 'redeemReward']);
+    Route::get('/points/{userId}/coupons', [PointsController::class, 'getUserCoupons']);
+
     Route::get('/direcciones', [DireccionController::class, 'index']);
     Route::post('/direcciones', [DireccionController::class, 'store']);
     Route::put('/direcciones/{id}', [DireccionController::class, 'update']);

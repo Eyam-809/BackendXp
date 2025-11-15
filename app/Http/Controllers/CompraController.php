@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Compra;
 use App\Models\DetalleCompra;
-use App\Models\Product;
-use App\Models\Pedido; // <-- agregado
+use App\Models\UserPoints;
+use App\Models\PointsHistory;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class CompraController extends Controller
@@ -25,67 +25,59 @@ class CompraController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $request->validate([
             'user_id' => 'required|exists:users,id',
-            'metodo_pago' => 'nullable|string|max:50',
-            'direccion_envio' => 'nullable|string|max:255',
-            'telefono_contacto' => 'nullable|string|max:20',
-            'productos' => 'required|array',
-            'productos.*.producto_id' => 'required|exists:products,id',
-            'productos.*.cantidad' => 'required|integer|min:1',
-            'productos.*.precio_unitario' => 'required|numeric|min:0',
+            'total' => 'required|numeric|min:0',
+            'items' => 'required|array',
+            'direccion_id' => 'required|exists:direcciones,id'
         ]);
 
+        DB::beginTransaction();
         try {
-            DB::beginTransaction();
-
-            // Crear compra principal
+            // Crear la compra
             $compra = Compra::create([
-                'user_id' => $validated['user_id'],
-                'metodo_pago' => $validated['metodo_pago'] ?? null,
-                'direccion_envio' => $validated['direccion_envio'] ?? null,
-                'telefono_contacto' => $validated['telefono_contacto'] ?? null,
+                'user_id' => $request->user_id,
+                'total' => $request->total,
                 'estado' => 'pendiente',
-                'total' => collect($validated['productos'])->sum(function ($p) {
-                    return $p['precio_unitario'] * $p['cantidad'];
-                }),
-                'fecha_pago' => now(),
+                'direccion_id' => $request->direccion_id
             ]);
 
-            // Agregar detalle
-            foreach ($validated['productos'] as $p) {
+            // Crear detalles de la compra
+            foreach ($request->items as $item) {
                 DetalleCompra::create([
                     'compra_id' => $compra->id,
-                    'producto_id' => $p['producto_id'],
-                    'cantidad' => $p['cantidad'],
-                    'precio_unitario' => $p['precio_unitario'],
-                    'subtotal' => $p['precio_unitario'] * $p['cantidad'],
+                    'producto_id' => $item['producto_id'],
+                    'cantidad' => $item['cantidad'],
+                    'precio_unitario' => $item['precio_unitario'],
+                    'subtotal' => $item['cantidad'] * $item['precio_unitario']
                 ]);
             }
 
-            foreach ($validated['productos'] as $p){
-                $pedido = Pedido::create([
-                'user_id' => $validated['user_id'],
-                'compra_id' => $compra->id,
-                'estado' => 'en proceso de empaquetado',
-                'total' => $compra->total,
-                'direccion_envio' => $compra->direccion_envio,
-                'telefono_contacto' => $compra->telefono_contacto,
-                'producto_id' => $p['producto_id'],
-                'fecha_pedido' => now(),
-            ]);
+            // ========== NUEVO: REGISTRAR PUNTOS ==========
+            // Calcular puntos: 10 puntos por cada $100 gastados
+            $pointsToAdd = (int)($request->total / 100) * 10;
+
+            if ($pointsToAdd > 0) {
+                $this->addPointsFromPurchase(
+                    $request->user_id,
+                    $pointsToAdd,
+                    $request->total,
+                    "Compra #" . $compra->id
+                );
             }
+            // =========================================
 
             DB::commit();
 
             return response()->json([
-                'message' => 'Compra registrada correctamente.',
-                'compra' => $compra->load('detalles'),
-                'pedido' => $pedido
+                'message' => 'Compra creada exitosamente',
+                'compra' => $compra,
+                'points_added' => $pointsToAdd ?? 0
             ], 201);
+
         } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['error' => 'Error al guardar la compra: ' . $e->getMessage()], 500);
+            DB::rollback();
+            return response()->json(['error' => 'Error al crear compra: ' . $e->getMessage()], 500);
         }
     }
 
@@ -156,4 +148,60 @@ class CompraController extends Controller
     return response()->json($result);
 }
 
+/**
+     * Método privado para agregar puntos desde una compra
+     */
+    private function addPointsFromPurchase($userId, $pointsToAdd, $amount, $description)
+    {
+        try {
+            // Obtener o crear registro de puntos del usuario
+            $userPoints = UserPoints::where('user_id', $userId)->first();
+            
+            if (!$userPoints) {
+                $userPoints = UserPoints::create([
+                    'user_id' => $userId,
+                    'points_earned' => 0,
+                    'points_spent' => 0,
+                    'current_points' => 0,
+                    'level' => 'Bronce',
+                    'total_earned' => 0,
+                    'monthly_goal' => 1000,
+                    'monthly_progress' => 0
+                ]);
+            }
+
+            // Guardar nivel anterior para comparar
+            $oldLevel = $userPoints->level;
+
+            // Actualizar puntos
+            $userPoints->points_earned += $pointsToAdd;
+            $userPoints->current_points += $pointsToAdd;
+            $userPoints->total_earned += $pointsToAdd;
+            $userPoints->monthly_progress += $pointsToAdd;
+            
+            // Verificar si subió de nivel
+            $newLevel = $userPoints->calculateLevel();
+            if ($newLevel !== $oldLevel) {
+                $userPoints->level = $newLevel;
+            }
+            
+            $userPoints->save();
+
+            // Crear registro en historial
+            PointsHistory::create([
+                'user_id' => $userId,
+                'points' => $pointsToAdd,
+                'type' => 'earned',
+                'description' => $description,
+                'source' => 'purchase',
+                'amount' => $amount
+            ]);
+
+            return true;
+
+        } catch (\Exception $e) {
+            \Log::error("Error al agregar puntos: " . $e->getMessage());
+            return false;
+        }
+    }
 }
