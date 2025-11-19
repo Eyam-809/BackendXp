@@ -15,6 +15,7 @@ class ProductController extends Controller
     {
         try {
             $products = Product::where('tipo', 'venta')
+                ->where('status_id', 2)
                 ->get()
                 ->each->append('image_url');
 
@@ -41,6 +42,7 @@ class ProductController extends Controller
             'subcategoria_id' => 'nullable|integer|exists:subcategorias,id',
             'tipo'            => 'required|string|in:venta,trueque',
             'video'           => 'nullable|file|mimes:mp4,mov,avi|max:51200', // 50MB máx
+            'status_id'       => 'nullable|integer|exists:statuses,id',
         ]);
 
         $product = new Product();
@@ -52,6 +54,25 @@ class ProductController extends Controller
         // 🔸 Si el tipo es "trueque", el precio se pone a 0
         if ($request->tipo === 'trueque') {
             $product->price = 0;
+        }
+
+        $product->status_id = 1;
+
+        // Asignación explícita para asegurar guardado si $fillable no incluye los campos
+        if ($request->has('categoria_id')) {
+            $product->categoria_id = $request->input('categoria_id');
+        }
+        if ($request->has('subcategoria_id')) {
+            $product->subcategoria_id = $request->input('subcategoria_id');
+        }
+        if ($request->has('id_user')) {
+            $product->id_user = $request->input('id_user');
+        }
+
+        // 🔸 Si el tipo es "trueque", el precio se pone a 0
+        if ($request->tipo === 'trueque') {
+            $product->price = 0;
+            $product->status_id = 2;
         }
 
         // 🔸 Subir video a S3 si se incluye (con fallback a base64 si S3 falla)
@@ -205,6 +226,7 @@ class ProductController extends Controller
         try {
             $products = Product::where('subcategoria_id', $subcategoria_id)
                 ->where('tipo', 'venta')
+                ->where('status_id', 2)
                 ->get()
                 ->each->append('image_url');
 
@@ -234,4 +256,154 @@ class ProductController extends Controller
             ], 500);
         }
     }
+
+    public function getByStatus($status_id)
+    {
+        try {
+            $products = Product::where('status_id', $status_id)
+                ->where('tipo', 'venta')
+                ->get()
+                ->each->append('image_url');
+
+            return response()->json($products);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => true,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Retorna el número de productos vendidos (status_id = 4) de un usuario.
+     */
+    public function countSoldByUser($userId)
+    {
+        $count = Product::where('id_user', $userId)
+            ->where('status_id', 4)
+            ->count();
+
+        return response()->json([
+            'user_id' => (int) $userId,
+            'sold_count' => $count,
+        ]);
+    }
+
+    /**
+     * Obtener todos los productos activos (status_id = 2).
+     */
+    public function getActiveProducts($userId)
+    {
+       $count = Product::where('id_user', $userId)
+            ->where('status_id', 2)
+            ->count();
+
+        return response()->json([
+            'user_id' => (int) $userId,
+            'sold_count_active' => $count,
+        ]);
+    }
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////ADMIN FUNCTIONS///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /**
+     * Obtener todos los productos con status_id = 1.
+     */
+    public function getStatusOneProducts()
+    {
+        try {
+            $products = Product::where('status_id', 1)
+                ->get()
+                ->each->append('image_url');
+
+            return response()->json($products);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => true,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Actualizar el status del producto (ej. 2 = aprobado, 3 = rechazado).
+     * Body esperado: { "status_id": 2, "reason": "motivo opcional" }
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        $request->validate([
+            'status_id' => 'required|integer|in:1,2,3,4'
+        ]);
+
+        $product = Product::findOrFail($id);
+        $product->status_id = $request->input('status_id');
+
+        // Guardar motivo de rechazo si existe y la columna está disponible
+        if ($request->filled('reason') && \Schema::hasColumn('products', 'rejection_reason')) {
+            $product->rejection_reason = $request->input('reason');
+        }
+
+        $product->save();
+
+        return response()->json([
+            'message' => 'Status actualizado correctamente',
+            'product' => $product
+        ]);
+    }
+
+    public function getApprovedProducts(Request $request)
+    {
+        try {
+            $user = $request->user();
+            $planId = $user->plan_id; // viene del token
+            $userId = $user->id;
+
+            $query = Product::where('status_id', 2);
+
+            // Si el plan es menor a 3, solo puede ver sus productos
+            if ($planId < 3) {
+                $query->where('id_user', $userId);
+            }
+
+            $products = $query->get()->each->append('image_url');
+
+            return response()->json($products);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => true,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getRejectedProducts(Request $request)
+    {
+        try {
+            $user = $request->user();
+            $planId = $user->plan_id;
+            $userId = $user->id;
+
+            $query = Product::where('status_id', 3);
+
+            // Plan menor a 3 = solo los suyos
+            if ($planId < 3) {
+                $query->where('id_user', $userId);
+            }
+
+            $products = $query->get()->each->append('image_url');
+
+            return response()->json($products);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => true,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
 }

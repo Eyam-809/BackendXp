@@ -71,6 +71,7 @@ Route::get('/products', [ProductController::class, 'index']); // Todos los produ
 Route::get('/products/trueques', [ProductController::class, 'getTrueques']); // Solo trueques
 Route::get('/products/subcategory/{subcategoria_id}', [ProductController::class, 'getBySubcategoria']); // Por subcategoría
 Route::get('/products/user/{id}', [ProductController::class, 'getUserProducts']); // Por usuario
+Route::get('/products/active/{userId}/count', [ProductController::class, 'getActiveProducts']);
 
 // Categorías y subcategorías
 Route::apiResource('categorias', CategoriaController::class);
@@ -103,6 +104,7 @@ Route::middleware('auth:sanctum')->group(function () {
     //Route::post('/products', [ProductController::class, 'store']);
     Route::put('/products/{id}', [ProductController::class, 'update']);
     Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+    //Route::get('/products/status/{status_id}', [ProductController::class, 'getByStatus']);
 
     // Carrito
     Route::post('/carrito/agregar', [CarritoController::class, 'agregarAlCarrito']);
@@ -112,11 +114,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // Compras - CON SISTEMA DE PUNTOS
     Route::post('/compras', [CompraController::class, 'store']);
     Route::get('/compras', [CompraController::class, 'index']);
+    // Compras
+    Route::post('/compras', [CompraController::class, 'store']);
+    Route::get('/compras', [CompraController::class, 'index']); // Ver todas las compras (admin)
     Route::get('/compras/{id}', [CompraController::class, 'show']);
     Route::put('/compras/{id}/actualizar-estado', [CompraController::class, 'actualizarEstado']);
     Route::put('/compras/{id}', [CompraController::class, 'update']);
     Route::delete('/compras/{id}', [CompraController::class, 'destroy']);
     Route::get('/compras/usuario/{userId}', [CompraController::class, 'getByUser']);
+    Route::get('/compras/user/{userId}/count', [CompraController::class, 'countByUser']);
 
     // Pedidos
     Route::get('/pedidos', [PedidoController::class, 'index']);
@@ -151,6 +157,10 @@ Route::get('/products/user/{id}', [ProductController::class, 'getUserProducts'])
 
 // Rutas para notificaciones de WhatsApp
 Route::middleware('auth:sanctum')->group(function () {
+
+    Route::get('/products/approved', [ProductController::class, 'getApprovedProducts']);
+Route::get('/products/rejected', [ProductController::class, 'getRejectedProducts']);
+
     // Enviar oferta masiva a todos los usuarios
     Route::post('/notificaciones/oferta-masiva', [NotificacionController::class, 'enviarOfertaMasiva']);
     
@@ -187,3 +197,15 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::get('/products/{id}', [ProductController::class, 'show']);
 
 Route::get('/direcciones/{userId}', [DireccionController::class, 'getbyUser']);
+
+//Prueba de estatus
+Route::get('/products/status/{status_id}', [ProductController::class, 'getByStatus']);
+Route::post('/compras/compraplan', [CompraController::class, 'storeSubscription']);
+
+// Ruta para contar productos vendidos por usuario
+Route::get('/products/user/{userId}/sold-count', [ProductController::class, 'countSoldByUser']);
+
+
+
+Route::get('/products/status/1', [ProductController::class, 'getStatusOneProducts']);
+Route::put('/products/{id}/status', [ProductController::class, 'updateStatus']);
