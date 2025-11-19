@@ -150,6 +150,10 @@ Route::get('/products/user/{id}', [ProductController::class, 'getUserProducts'])
 
 // Rutas para notificaciones de WhatsApp
 Route::middleware('auth:sanctum')->group(function () {
+
+    Route::get('/products/approved', [ProductController::class, 'getApprovedProducts']);
+Route::get('/products/rejected', [ProductController::class, 'getRejectedProducts']);
+
     // Enviar oferta masiva a todos los usuarios
     Route::post('/notificaciones/oferta-masiva', [NotificacionController::class, 'enviarOfertaMasiva']);
     
@@ -184,3 +188,8 @@ Route::post('/compras/compraplan', [CompraController::class, 'storeSubscription'
 
 // Ruta para contar productos vendidos por usuario
 Route::get('/products/user/{userId}/sold-count', [ProductController::class, 'countSoldByUser']);
+
+
+
+Route::get('/products/status/1', [ProductController::class, 'getStatusOneProducts']);
+Route::put('/products/{id}/status', [ProductController::class, 'updateStatus']);
