@@ -100,7 +100,6 @@ class ProductController extends Controller
             $imageContents = file_get_contents($file);
             $product->image = 'data:' . $mimeType . ';base64,' . base64_encode($imageContents);
         }
-        
 
         $product->save();
 

@@ -13,6 +13,7 @@
         "laravel/tinker": "^2.8",
         "league/flysystem-aws-s3-v3": "3.0",
         "socialiteproviders/microsoft": "^4.7",
+        "stripe/stripe-php": "^19.0",
         "twilio/sdk": "*"
     },
     "require-dev": {

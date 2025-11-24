@@ -33,4 +33,9 @@ class Compra extends Model
     return $this->belongsTo(Product::class);
 }
 
+public function paymentTransactions()
+    {
+        return $this->hasMany(PaymentTransaction:: class, 'compra_id');
+    }
+
 }

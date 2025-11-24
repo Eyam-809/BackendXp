@@ -15,8 +15,8 @@ class DetalleCompra extends Model
         'producto_id',
         'cantidad',
         'precio_unitario',
-        'subtotal',
         'tipo_servicio',
+        'subtotal'
     ];
 
     public function compra()

@@ -1,7 +1,8 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\PaymentCardController;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\RegistroController;
@@ -20,6 +21,10 @@ use App\Http\Controllers\PointsController;
 use App\Http\Controllers\CompraController;
 use App\Http\Controllers\DetalleCompraController;
 use App\Http\Controllers\PedidoController;
+use App\Http\Controllers\DireccionController;
+use App\Http\Controllers\StripeController;
+
+
 
 /*
 |--------------------------------------------------------------------------
@@ -107,9 +112,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/carrito', [CarritoController::class, 'verCarrito']);
     Route::delete('/carrito/eliminar/{id}', [CarritoController::class, 'eliminarDelCarrito']);
 
-    // Compras
+    // Compras - CON SISTEMA DE PUNTOS
     Route::post('/compras', [CompraController::class, 'store']);
-    Route::get('/compras', [CompraController::class, 'index']); // Ver todas las compras (admin)
+    Route::get('/compras', [CompraController::class, 'index']);
     Route::get('/compras/{id}', [CompraController::class, 'show']);
     Route::put('/compras/{id}/actualizar-estado', [CompraController::class, 'actualizarEstado']);
     Route::put('/compras/{id}', [CompraController::class, 'update']);
@@ -173,6 +178,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/points/{userId}/history', [PointsController::class, 'getPointsHistory']);
     Route::post('/points/add', [PointsController::class, 'addPointsFromPurchase']);
     Route::post('/points/redeem', [PointsController::class, 'redeemReward']);
+    Route::get('/points/{userId}/coupons', [PointsController::class, 'getUserCoupons']);
+
+    Route::get('/direcciones', [DireccionController::class, 'index']);
+    Route::post('/direcciones', [DireccionController::class, 'store']);
+    Route::put('/direcciones/{id}', [DireccionController::class, 'update']);
+    Route::delete('/direcciones/{id}', [DireccionController::class, 'destroy']);
+   // Route::get('/direcciones/{id}', [DireccionController::class, 'show']);
     
 });
 
@@ -193,3 +205,8 @@ Route::get('/products/user/{userId}/sold-count', [ProductController::class, 'cou
 
 Route::get('/products/status/1', [ProductController::class, 'getStatusOneProducts']);
 Route::put('/products/{id}/status', [ProductController::class, 'updateStatus']);
+
+Route::get('/direcciones/{userId}', [DireccionController::class, 'getbyUser']);
+
+Route::post('/stripe/charge', [StripeController::class, 'charge']);
+

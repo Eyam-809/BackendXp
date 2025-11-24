@@ -61,4 +61,10 @@ return [
         'whatsapp_from' => env('TWILIO_PHONE_NUMBER', '+17622453853'), // Número de Twilio
     ],
 
+    'stripe' => [
+        'key' => env('STRIPE_KEY'),
+        'secret' => env('STRIPE_SECRET'),
+    ],
+
+
 ];

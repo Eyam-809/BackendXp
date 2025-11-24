@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\UserPoints;
 use App\Models\PointsHistory;
 use App\Models\User;
+use App\Models\RedeemedCoupon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -125,7 +126,9 @@ class PointsController extends Controller
             'user_id' => 'required|exists:users,id',
             'reward_id' => 'required|integer',
             'points_required' => 'required|integer|min:1',
-            'description' => 'required|string'
+            'description' => 'required|string',
+            'coupon_name' => 'required|string',
+            'coupon_type' => 'required|string'
         ]);
 
         DB::beginTransaction();
@@ -145,6 +148,21 @@ class PointsController extends Controller
             $userPoints->points_spent += $request->points_required;
             $userPoints->save();
 
+            // Crear cupón canjeado
+            $coupon = new RedeemedCoupon();
+            $couponCode = $coupon->generateCouponCode();
+            
+            $coupon = RedeemedCoupon::create([
+                'user_id' => $request->user_id,
+                'coupon_type' => $request->coupon_type,
+                'coupon_name' => $request->coupon_name,
+                'description' => $request->description,
+                'points_spent' => $request->points_required,
+                'coupon_code' => $couponCode,
+                'discount_percentage' => $request->coupon_type === 'descuento' ? 10 : null,
+                'discount_amount' => $request->coupon_type === 'envio' ? 0 : null
+            ]);
+
             // Crear registro en historial
             PointsHistory::create([
                 'user_id' => $request->user_id,
@@ -159,12 +177,23 @@ class PointsController extends Controller
             return response()->json([
                 'message' => 'Recompensa canjeada exitosamente',
                 'points_spent' => $request->points_required,
-                'current_points' => $userPoints->current_points
+                'current_points' => $userPoints->current_points,
+                'coupon_code' => $couponCode,
+                'coupon_id' => $coupon->id
             ]);
 
         } catch (\Exception $e) {
             DB::rollback();
-            return response()->json(['error' => 'Error al canjear recompensa'], 500);
+            return response()->json(['error' => 'Error al canjear recompensa: ' . $e->getMessage()], 500);
         }
+    }
+
+    public function getUserCoupons($userId)
+    {
+        $coupons = RedeemedCoupon::where('user_id', $userId)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($coupons);
     }
 }
