@@ -66,5 +66,12 @@ return [
         'secret' => env('STRIPE_SECRET'),
     ],
 
+    'superset' => [
+    'url'      => env('SUPERSET_URL', 'http://localhost:8088'),
+    'username' => env('SUPERSET_USERNAME', 'admin'),
+    'password' => env('SUPERSET_PASSWORD', 'admin'),
+],
+
+
 
 ];

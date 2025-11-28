@@ -19,7 +19,9 @@ class PaymentTransaction extends Model
         'card_brand',
         'receipt_url',
         'raw_request',
-        'raw_response'
+        'raw_response',
+        'fee',
+        'net_amount'
     ];
 
     public function compra()
