@@ -188,8 +188,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/direcciones/{id}', [DireccionController::class, 'destroy']);
    // Route::get('/direcciones/{id}', [DireccionController::class, 'show']);
 
-   Route::post('/superset/token', [SupersetController::class, 'generateToken']);
-Route::get('/superset/guest-token', [SupersetController::class, 'guestToken']);
     
 });
 
@@ -218,5 +216,5 @@ Route::get('/paypal/pay', [PayPalController::class, 'createPayment'])->name('pay
 Route::get('/paypal/success', [PayPalController::class, 'success'])->name('paypal.success');
 Route::get('/paypal/cancel', [PayPalController::class, 'cancel'])->name('paypal.cancel');
 
-
+Route::get('/superset/guest-token', [SupersetController::class, 'guestToken']);
 
