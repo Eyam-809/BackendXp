@@ -35,7 +35,8 @@ class OAuthController extends Controller
     $token = $user->createToken('auth_token')->plainTextToken;
 
     // 🔥 Redirige al frontend con el token como query string
-    return redirect("http://localhost:3000//login/google?token={$token}&id={$user->id}&plan_id={$user->plan_id}&name=" . urlencode($user->name));
+   return redirect("https://frontend-xp-mwnlk.vercel.app/login/google?token={$token}&id={$user->id}&plan_id={$user->plan_id}&name=" . urlencode($user->name));
+
 }
 
 
@@ -62,7 +63,8 @@ public function handleFacebookCallback()
     $token = $user->createToken('auth_token')->plainTextToken;
 
     // 🔥 Igual que Google: redirige al frontend con token
-    return redirect("http://localhost:3000/login/facebook?token={$token}&id={$user->id}&plan_id={$user->plan_id}&name=" . urlencode($user->name));
+    return redirect("https://frontend-xp-mwnlk.vercel.app/login/facebook?token={$token}&id={$user->id}&plan_id={$user->plan_id}&name=" . urlencode($user->name));
+
 }
 
 
@@ -93,7 +95,7 @@ public function handleMicrosoftCallback()
     $token = $user->createToken('auth_token')->plainTextToken;
 
     // 🔥 Redirigir al frontend igual que Google y Facebook
-    return redirect("http://localhost:3000/login/microsoft?token={$token}&id={$user->id}&plan_id={$user->plan_id}&name=" . urlencode($user->name));
+    return redirect("https://frontend-xp-mwnlk.vercel.app/login/microsoft?token={$token}&id={$user->id}&plan_id={$user->plan_id}&name=" . urlencode($user->name));
 }
 
 
@@ -128,7 +130,7 @@ public function handleMicrosoftCallback()
     $token = $user->createToken('auth_token')->plainTextToken;
 
     return redirect(
-        "http://localhost:3000/login/github?token={$token}&id={$user->id}&plan_id={$user->plan_id}&name=" . urlencode($user->name)
+        "https://frontend-xp-mwnlk.vercel.app/login/github?token={$token}&id={$user->id}&plan_id={$user->plan_id}&name=" . urlencode($user->name)
     );
 }
 
