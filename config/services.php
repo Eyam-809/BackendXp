@@ -79,7 +79,7 @@ return [
     'preset' => [
     'url' => env('PRESET_URL'),
     'api_secret' => env('PRESET_API_SECRET'),
-],
+    ],
 
 
 
