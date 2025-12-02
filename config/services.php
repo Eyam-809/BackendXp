@@ -67,10 +67,20 @@ return [
     ],
 
     'superset' => [
-        'url' => env('SUPERSET_URL'),
-        'username' => env('SUPERSET_USERNAME'),
-        'password' => env('SUPERSET_PASSWORD'),
+        'url'        => env('SUPERSET_URL'),
+        'api_key'    => env('SUPERSET_API_KEY'),
+        'api_secret' => env('SUPERSET_API_SECRET'),
+        'team'       => env('SUPERSET_TEAM'),
+        'workspace'  => env('SUPERSET_WORKSPACE'),
+        'team_id'    => env('SUPERSET_TEAM_ID'),
+        'workspace_id' => env('SUPERSET_WORKSPACE_ID'),
     ],
+
+    'preset' => [
+    'url' => env('PRESET_URL'),
+    'api_secret' => env('PRESET_API_SECRET'),
+],
+
 
 
 

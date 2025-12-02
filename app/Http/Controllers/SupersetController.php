@@ -10,87 +10,81 @@ class SupersetController extends Controller
 {
     public function guestToken(Request $request)
     {
-        $supersetUrl = rtrim(config('services.superset.url'), '/'); // e.g. https://mi-superset.example.com
-        $username    = config('services.superset.username'); // admin user
-        $password    = config('services.superset.password');
+        $apiKey      = config('services.superset.api_key');
+        $apiSecret   = config('services.superset.api_secret');
+        $teamId      = config('services.superset.team_id');        // 6b49e5a3
+        $workspaceId = config('services.superset.workspace_id');   // 6c152ecc
 
-        $client = new Client([
-            'base_uri' => $supersetUrl,
-            'cookies'  => true,
-            'timeout'  => 10,
-            // 'verify' => false, // solo si usas certificados auto-firmados (no recomendado)
-        ]);
+        // ID de tu dashboard embebido (puedes sobreescribirlo desde el front)
+        $dashboardId = $request->input('dashboard_id', '5ce05b5b-db97-45fe-8166-c190312f555b');
 
         try {
-            // 1) Login -> access_token
-            $loginRes = $client->post('/api/v1/security/login', [
-                'headers' => ['Content-Type' => 'application/json', 'Accept' => 'application/json'],
+            $client = new Client([
+                'timeout' => 10,
+            ]);
+
+            // 1) Obtener access_token con tus API key + secret
+            $authResponse = $client->post('https://api.app.preset.io/v1/auth/', [
                 'json' => [
-                    'username' => $username,
-                    'password' => $password,
-                    'provider' => 'db',
-                    'refresh'  => true,
+                    'name'   => $apiKey,
+                    'secret' => $apiSecret,
+                ],
+                'headers' => [
+                    'Accept'       => 'application/json',
+                    'Content-Type' => 'application/json',
                 ],
             ]);
-            $loginBody = json_decode($loginRes->getBody()->getContents(), true);
-            $accessToken = $loginBody['access_token'] ?? null;
-            if (! $accessToken) {
-                Log::error('Superset login failed', ['body' => $loginBody]);
-                return response()->json(['error' => 'No se obtuvo access_token'], 500);
+
+            $authBody    = json_decode($authResponse->getBody()->getContents(), true);
+            $accessToken = $authBody['payload']['access_token'] ?? null;
+
+            if (!$accessToken) {
+                throw new \Exception('No se pudo obtener access_token de Preset');
             }
 
-            // 2) CSRF token
-            $csrfRes = $client->get('/api/v1/security/csrf_token/', [
-                'headers' => ['Authorization' => 'Bearer ' . $accessToken, 'Accept' => 'application/json'],
-            ]);
-            $csrfBody = json_decode($csrfRes->getBody()->getContents(), true);
-            $csrfToken = $csrfBody['result'] ?? null;
-            if (! $csrfToken) {
-                Log::error('No se obtuvo CSRF token', ['body' => $csrfBody]);
-                return response()->json(['error' => 'No se obtuvo CSRF token'], 500);
-            }
-
-            // 3) Guest token
-            $dashboardUuid = $request->input('dashboard_uuid', 'f8416863-b8d0-4013-bf37-92d66d027b01'); // cambiar si quieres
-            // Evitar error cuando NO hay login
-            $user = $request->user();
-
+            // 2) Pedir guest-token al Manager API
             $payload = [
-                'user' => [
-                    'username'   => $user ? $user->email : 'guest',
-                    'first_name' => $user ? $user->name  : 'Guest',
-                    'last_name'  => '',
+                "user" => [
+                    "username"   => "guest_".uniqid(),
+                    "first_name" => "Guest",
+                    "last_name"  => "",
                 ],
-                'resources' => [['type' => 'dashboard', 'id' => $dashboardUuid]],
-                'rls' => [],
-                'aud' => 'superset',
+                "resources" => [
+                    ["type" => "dashboard", "id" => $dashboardId],
+                ],
+                "rls" => [],
             ];
 
+            $guestResponse = $client->post(
+                "https://manage.app.preset.io/api/v1/teams/{$teamId}/workspaces/{$workspaceId}/guest-token/",
+                [
+                    'headers' => [
+                        // según docs: se manda el token directo en Authorization
+                        'Authorization' => $accessToken,
+                        'Accept'        => 'application/json',
+                        'Content-Type'  => 'application/json',
+                    ],
+                    'json' => $payload,
+                ]
+            );
 
-            $guestRes = $client->post('/api/v1/security/guest_token/', [
-                'headers' => [
-                    'Authorization' => 'Bearer ' . $accessToken,
-                    'X-CSRFToken'   => $csrfToken,
-                    'Content-Type'  => 'application/json',
-                    'Accept'        => 'application/json',
-                ],
-                'json' => $payload,
-            ]);
+            $guestBody = json_decode($guestResponse->getBody()->getContents(), true);
 
-            $guestBody = json_decode($guestRes->getBody()->getContents(), true);
-            $guestToken = $guestBody['token'] ?? null;
-            if (! $guestToken) {
-                Log::error('No se obtuvo guest token', ['body' => $guestBody]);
-                return response()->json(['error' => 'No se obtuvo guest token', 'details' => $guestBody], 500);
+            // Estructura de respuesta según docs de embed
+            $token = $guestBody['data']['payload']['token'] ?? null;
+
+            if (!$token) {
+                throw new \Exception('Preset no regresó guest token');
             }
 
-            return response()->json(['token' => $guestToken]);
+            return response()->json(['token' => $token]);
+
         } catch (\Throwable $e) {
-            Log::error('Excepción al generar guest token', ['error' => $e->getMessage()]);
-            return response()->json(['error' => 'Excepción al generar guest token', 'details' => $e->getMessage()], 500);
+            Log::error('Error al pedir guest token', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 }
-
-
-//Pruebas de guardada git

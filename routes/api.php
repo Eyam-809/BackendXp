@@ -25,6 +25,7 @@ use App\Http\Controllers\DireccionController;
 use App\Http\Controllers\StripeController;
 use App\Http\Controllers\PayPalController;
 use App\Http\Controllers\SupersetController;
+use App\Http\Controllers\PresetController;
 
 
 
@@ -216,5 +217,7 @@ Route::get('/paypal/pay', [PayPalController::class, 'createPayment'])->name('pay
 Route::get('/paypal/success', [PayPalController::class, 'success'])->name('paypal.success');
 Route::get('/paypal/cancel', [PayPalController::class, 'cancel'])->name('paypal.cancel');
 
-Route::get('/superset/guest-token', [SupersetController::class, 'guestToken']);
+Route::post('/superset/guest-token', [SupersetController::class, 'guestToken']);
+Route::post('/preset/guest-token', [PresetController::class, 'guestToken']);
+
 
