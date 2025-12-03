@@ -55,9 +55,11 @@ public function store(Request $request)
         'name', 'description', 'price', 'stock',
         'id_user', 'categoria_id', 'subcategoria_id', 'tipo'
     ]));
+
+    // Status inicial
     $product->status_id = 1;
 
-    // Asignación explícita
+    // Asignaciones explícitas
     if ($request->has('categoria_id')) {
         $product->categoria_id = $request->input('categoria_id');
     }
@@ -68,45 +70,37 @@ public function store(Request $request)
         $product->id_user = $request->input('id_user');
     }
 
-    // 🔸 Si el tipo es "trueque", el precio se pone a 0
+    // 🔸 Si es trueque, precio 0 y aprobado
     if ($request->tipo === 'trueque') {
         $product->price = 0;
         $product->status_id = 2;
     }
 
-    // 🔸 Subir video a S3 si se incluye (con fallback a base64 si S3 falla)
+    // 🔸 Subir video a S3 con fallback a base64
     if ($request->hasFile('video')) {
         $file = $request->file('video');
         $mimeType = $file->getClientMimeType();
 
         try {
             if (!$file->isValid()) {
-                \Log::error('Upload inválido', ['error' => $file->getErrorMessage() ?? 'unknown']);
                 return response()->json(['error' => 'Archivo de video inválido'], 400);
             }
 
             $path = $file->store('videos', 's3');
             Storage::disk('s3')->setVisibility($path, 'public');
+
             $product->video = Storage::disk('s3')->url($path);
-            \Log::info('Video subido a S3', ['path' => $path, 'url' => $product->video]);
         } catch (\Throwable $e) {
-            \Log::error('S3 upload failed', [
-                'message' => $e->getMessage(),
-                'file' => $file->getClientOriginalName(),
-                'size' => $file->getSize()
-            ]);
             try {
                 $contents = file_get_contents($file->getRealPath());
                 $product->video = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
-                \Log::warning('Fallback: video guardado en base64 por fallo en S3', ['file' => $file->getClientOriginalName()]);
             } catch (\Throwable $ex) {
-                \Log::error('Fallback base64 falló', ['error' => $ex->getMessage()]);
                 return response()->json(['error' => 'No se pudo subir el video: ' . $e->getMessage()], 500);
             }
         }
     }
 
-    // 🔸 Guardar imagen en base64 (sin usar disco)
+    // 🔸 Guardar imagen en base64
     if ($request->hasFile('image')) {
         $file = $request->file('image');
         $mimeType = $file->getClientMimeType();
@@ -114,26 +108,15 @@ public function store(Request $request)
         $product->image = 'data:' . $mimeType . ';base64,' . base64_encode($imageContents);
     }
 
+    // 🔥 Guardar producto
     $product->save();
-
-    // 🔸 Enviar correo al usuario (no romper si falla SMTP)
-    try {
-        if ($product->user && $product->user->email) {
-            Mail::to($product->user->email)->send(new ProductoSubido($product));
-        }
-    } catch (\Throwable $e) {
-        \Log::error('No se pudo enviar correo de producto subido', [
-            'product_id' => $product->id,
-            'error' => $e->getMessage(),
-        ]);
-        // NO hacemos return, para que la API siga respondiendo 201
-    }
 
     return response()->json([
         'message' => 'Producto creado con éxito',
         'product' => $product,
     ], 201);
 }
+
 
 
     // 🔹 Mostrar producto por ID
