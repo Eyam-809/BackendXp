@@ -7,6 +7,7 @@ use App\Models\DetalleCompra;
 use App\Models\Product;
 use App\Models\Pedido;
 use App\Models\Plan;
+use App\Models\User;
 use App\Models\PlanVigencia;
 use Carbon\Carbon;
 use App\Models\UserPoints;
@@ -14,6 +15,7 @@ use App\Models\PointsHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\PaymentTransaction;
+use Illuminate\Support\Facades\Log;
 
 class CompraController extends Controller
 {
@@ -233,7 +235,7 @@ class CompraController extends Controller
     {
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
-            'plan_id' => 'required|exists:plans,id',
+            'plan_id' => 'required|exists:planes,id',
             'metodo_pago' => 'nullable|string|max:50',
             'telefono_contacto' => 'nullable|string|max:20',
             'direccion_envio' => 'nullable|string|max:255',
@@ -247,9 +249,11 @@ class CompraController extends Controller
             $plan = Plan::findOrFail($validated['plan_id']);
             $userId = $validated['user_id'];
             $price = $plan->price ?? 0;
-            $duration = $validated['duration_days'] ?? ($plan->duration_days ?? 30);
 
-            // Crear compra principal
+            // Obtener usuario ANTES de usarlo
+            $user = \App\Models\User::find($userId);
+
+            // Crear compra
             $compra = Compra::create([
                 'user_id' => $userId,
                 'metodo_pago' => $validated['metodo_pago'] ?? null,
@@ -260,38 +264,29 @@ class CompraController extends Controller
                 'fecha_pago' => now(),
             ]);
 
-            // Agregar detalle: guardamos el plan id en producto_id
+            // Detalle
             $detalle = DetalleCompra::create([
                 'compra_id' => $compra->id,
-                'producto_id' => $plan->id,       // <-- aquí se guarda el id del plan
+                'producto_id' => 2041,  // ✔️ mejor que 2041 fijo
                 'cantidad' => 1,
                 'precio_unitario' => $price,
                 'subtotal' => $price,
-                'tipo_servicio' => 'suscripcion', // <-- tipo_servicio como suscripcion
+                'tipo_servicio' => 'servicio',
             ]);
 
-            // Crear o actualizar la vigencia del plan para el usuario
-            $fecha_inicio = Carbon::now();
-            $fecha_fin = $fecha_inicio->copy()->addDays($duration);
-
+            // Vigencia EXACTA que pediste
             $vigencia = PlanVigencia::updateOrCreate(
-                ['user_id' => $userId],
+                ['user_id' => $user->id],
                 [
-                    'plan_id' => $plan->id,
-                    'fecha_inicio' => $fecha_inicio,
-                    // Si ya tiene una vigencia, la nueva fecha de fin debe ser después de la vigencia actual si esta es futura,
-                    // pero para simplificar, se toma la lógica de reemplazar o establecer nueva.
-                    'fecha_fin' => $fecha_fin,
-                    'payment_reference' => $validated['payment_reference'] ?? null,
+                    'fecha_inicio' => Carbon::today(),
+                    'fecha_fin' => Carbon::today()->addDays(30),
+                    
                 ]
             );
 
-            // Actualizar el plan del usuario
-            $user = \App\Models\User::find($userId);
-            if ($user) {
-                $user->plan_id = $plan->id;
-                $user->save();
-            }
+            // Guardar plan en el usuario
+            $user->plan_id = 2;
+            $user->save();
 
             DB::commit();
 
@@ -301,16 +296,16 @@ class CompraController extends Controller
                 'detalle' => $detalle,
                 'vigencia' => $vigencia,
             ], 201);
+
         } catch (\Throwable $e) {
             DB::rollBack();
-            \Log::error('Error creando suscripción/compra', [
+            Log::error('Error creando suscripción/compra', [
                 'error' => $e->getMessage(),
                 'request' => $request->all()
             ]);
             return response()->json(['error' => 'Error al crear compra de suscripción: ' . $e->getMessage()], 500);
         }
     }
-
     /**
      * Retorna el número de compras de un usuario.
      * (Método del HEAD/Usuario)

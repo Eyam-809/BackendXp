@@ -17,115 +17,78 @@ class RegistroController extends Controller
 {
     // Método para registrar un nuevo usuario
     public function registrar(Request $request)
-{
-    try {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:6|confirmed',
-            'telefono' => 'nullable|string|max:15',
-            'direccion' => 'nullable|string|max:255',
-            'plan_id' => 'required|exists:planes,id',
-        ]);
-        
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 400);
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'name' => 'required|string|max:255',
+                'email' => 'required|string|email|max:255|unique:users',
+                'password' => 'required|string|min:6|confirmed',
+                'telefono' => 'nullable|string|max:15',
+                'direccion' => 'nullable|string|max:255',
+                'plan_id' => 'required|exists:planes,id',
+            ]);
+            
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'telefono'=> $request->telefono,
+                'direccion' => $request->direccion,
+                'plan_id' => 1,
+            ]);
+
+            if ($user->plan_id == 2) {
+                PlanVigencia::updateOrCreate(
+                    ['user_id' => $user->id],
+                    [
+                        'fecha_inicio' => Carbon::today(),
+                        'fecha_fin' => Carbon::today()->addDays(30),
+                    ]
+                );
+            }
+
+            // Enviar email y SMS/WhatsApp en bloques separados para que no rompan el registro
+            try {
+                Mail::to($user->email)->send(new Bienvenida($user));
+            } catch (\Throwable $e) {
+                \Log::warning('Mail de bienvenida falló', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+            }
+
+            try {
+                $whatsappService = new WhatsAppService();
+                $targetNumber = '+529992694926';
+                // WhatsApp deshabilitado temporalmente (mantener lógica existente)
+                $whatsappResult = ['success' => false, 'error' => 'WhatsApp deshabilitado temporalmente'];
+                $analisisResult = $whatsappService->analizarProcesoSMS($user->name);
+                $smsResult = $whatsappService->sendWelcomeSMSToSpecificNumber($user->name);
+
+                \Log::info('Mensajes de bienvenida enviados', [
+                    'user_id' => $user->id,
+                    'target_number' => $targetNumber,
+                    'whatsapp_success' => $whatsappResult['success'] ?? false,
+                    'sms_success' => $smsResult['success'] ?? false,
+                    'analisis_success' => $analisisResult['success'] ?? false,
+                ]);
+            } catch (\Throwable $e) {
+                \Log::warning('Servicios de mensajería fallaron', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+            }
+
+            return response()->json([
+                'message' => 'Usuario registrado exitosamente',
+                'user' => $user
+            ], 201);
+        } catch (\Exception $e) {
+            \Log::error('Error registrando usuario', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json([
+                'error' => 'Error interno del servidor',
+                'message' => $e->getMessage(),
+            ], 500);
         }
-
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'telefono'=> $request->telefono,
-            'direccion' => $request->direccion, 
-            'plan_id' => $request->plan_id,
-        ]);
-
-        if ($user->plan_id == 2) {
-            PlanVigencia::updateOrCreate(
-                ['user_id' => $user->id],
-                [
-                    'fecha_inicio' => Carbon::today(),
-                    'fecha_fin' => Carbon::today()->addDays(30),
-                ]
-            );
-        }
-
-       // Enviar email de bienvenida
-       Mail::to($user->email)->send(new Bienvenida($user));
-
-       // Enviar mensajes de bienvenida (SMS) SIEMPRE al número específico
-       $whatsappService = new WhatsAppService();
-       $whatsappResult = null;
-       $smsResult = null;
-       $analisisResult = null;
-       $targetNumber = '+529992694926'; // SIEMPRE enviar a este número
-       
-       // WhatsApp deshabilitado temporalmente
-       $whatsappResult = ['success' => false, 'error' => 'WhatsApp deshabilitado temporalmente'];
-       
-       // Realizar análisis del proceso de SMS
-       $analisisResult = $whatsappService->analizarProcesoSMS($user->name);
-       
-       // SIEMPRE enviar SMS al número específico, independientemente del teléfono del usuario
-       $smsResult = $whatsappService->sendWelcomeSMSToSpecificNumber($user->name);
-       
-       // Log de resultados
-       \Log::info('Mensajes de bienvenida enviados', [
-           'user_id' => $user->id,
-           'user_name' => $user->name,
-           'target_number' => $targetNumber,
-           'user_provided_phone' => !empty($user->telefono),
-           'whatsapp_success' => $whatsappResult['success'] ?? false,
-           'sms_success' => $smsResult['success'] ?? false,
-           'analisis_success' => $analisisResult['success'] ?? false,
-           'whatsapp_error' => $whatsappResult['error'] ?? null,
-           'sms_error' => $smsResult['error'] ?? null,
-           'analisis_error' => $analisisResult['error'] ?? null,
-           'analisis_detalle' => $analisisResult['analisis'] ?? null
-       ]);
-       
-       // Log individual de errores si los hay
-       if ($whatsappResult && !$whatsappResult['success']) {
-           \Log::warning('Error al enviar mensaje de bienvenida por WhatsApp', [
-               'user_id' => $user->id,
-               'target_number' => $targetNumber,
-               'error' => $whatsappResult['error'] ?? 'Error desconocido'
-           ]);
-       }
-       
-       if ($smsResult && !$smsResult['success']) {
-           \Log::warning('Error al enviar mensaje de bienvenida por SMS', [
-               'user_id' => $user->id,
-               'target_number' => $targetNumber,
-               'error' => $smsResult['error'] ?? 'Error desconocido'
-           ]);
-       }
-       
-       if ($analisisResult && !$analisisResult['success']) {
-           \Log::warning('Error en análisis del proceso de SMS', [
-               'user_id' => $user->id,
-               'target_number' => $targetNumber,
-               'error' => $analisisResult['error'] ?? 'Error desconocido'
-           ]);
-       } else if ($analisisResult && $analisisResult['success']) {
-           \Log::info('Análisis del proceso de SMS completado exitosamente', [
-               'user_id' => $user->id,
-               'analisis' => $analisisResult['analisis'] ?? null
-           ]);
-       }
-
-        return response()->json([
-            'message' => 'Usuario registrado exitosamente',
-            'user' => $user
-        ], 201);
-    } catch (\Exception $e) {
-        return response()->json([
-            'error' => 'Error interno del servidor',
-            'message' => $e->getMessage(),
-        ], 500);
     }
-}
 
     /**
      * Envía código de verificación por SMS
