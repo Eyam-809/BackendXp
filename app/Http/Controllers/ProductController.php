@@ -79,6 +79,12 @@ class ProductController extends Controller
             $mimeType = $file->getClientMimeType();
 
             try {
+                // Validación adicional del archivo
+                if (! $file->isValid()) {
+                    \Log::error('Upload inválido', ['error' => $file->getErrorMessage() ?? 'unknown']);
+                    return response()->json(['error' => 'Archivo de video inválido'], 400);
+                }
+
                 // Intentar subir a S3
                 $path = $file->store('videos', 's3');
                 // Asegurar visibilidad pública
@@ -87,10 +93,21 @@ class ProductController extends Controller
                 $product->video = Storage::disk('s3')->url($path);
                 \Log::info('Video subido a S3', ['path' => $path, 'url' => $product->video]);
             } catch (\Throwable $e) {
-                // Si falla S3, fallback a base64 y registrar la causa
-                \Log::warning('S3 upload failed, guardando video en base64', ['error' => $e->getMessage()]);
-                $contents = file_get_contents($file->getRealPath());
-                $product->video = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
+                // Log detallado y devolver error claro al front
+                \Log::error('S3 upload failed', [
+                    'message' => $e->getMessage(),
+                    'file' => $file->getClientOriginalName(),
+                    'size' => $file->getSize()
+                ]);
+                // Fallback a base64 (si quieres) o devolver error para forzar corrección
+                try {
+                    $contents = file_get_contents($file->getRealPath());
+                    $product->video = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
+                    \Log::warning('Fallback: video guardado en base64 por fallo en S3', ['file' => $file->getClientOriginalName()]);
+                } catch (\Throwable $ex) {
+                    \Log::error('Fallback base64 falló', ['error' => $ex->getMessage()]);
+                    return response()->json(['error' => 'No se pudo subir el video: '.$e->getMessage()], 500);
+                }
             }
         }
 
@@ -142,19 +159,23 @@ class ProductController extends Controller
             $file = $request->file('video');
             $mimeType = $file->getClientMimeType();
 
+            if (! $file->isValid()) {
+                \Log::error('Upload inválido en update', ['error' => $file->getErrorMessage() ?? 'unknown']);
+                return response()->json(['error' => 'Archivo de video inválido'], 400);
+            }
+
             // Intentar eliminar video previo en S3 si existía como URL pública
-            if ($product->video && !str_starts_with($product->video, 'data:') && (str_starts_with($product->video, 'http://') || str_starts_with($product->video, 'https://'))) {
-                try {
-                    $oldUrl = $product->video;
-                    $parsed = parse_url($oldUrl);
+            try {
+                if ($product->video && !str_starts_with($product->video, 'data:') && (str_starts_with($product->video, 'http://') || str_starts_with($product->video, 'https://'))) {
+                    $parsed = parse_url($product->video);
                     $oldPath = isset($parsed['path']) ? ltrim($parsed['path'], '/') : null;
-                    if ($oldPath) {
+                    if ($oldPath && Storage::disk('s3')->exists($oldPath)) {
                         Storage::disk('s3')->delete($oldPath);
                         \Log::info('Video anterior eliminado de S3', ['old_path' => $oldPath]);
                     }
-                } catch (\Throwable $e) {
-                    \Log::warning('No se pudo eliminar video anterior en S3', ['error' => $e->getMessage()]);
                 }
+            } catch (\Throwable $e) {
+                \Log::warning('No se pudo eliminar video anterior en S3', ['error' => $e->getMessage()]);
             }
 
             // Intentar subir a S3 el nuevo video
@@ -164,9 +185,19 @@ class ProductController extends Controller
                 $product->video = Storage::disk('s3')->url($path);
                 \Log::info('Video subido a S3 en actualización', ['path' => $path, 'url' => $product->video]);
             } catch (\Throwable $e) {
-                \Log::warning('S3 upload failed on update, guardando en base64', ['error' => $e->getMessage()]);
-                $contents = file_get_contents($file->getRealPath());
-                $product->video = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
+                \Log::error('S3 upload failed en update', [
+                    'message' => $e->getMessage(),
+                    'file' => $file->getClientOriginalName(),
+                    'size' => $file->getSize()
+                ]);
+                try {
+                    $contents = file_get_contents($file->getRealPath());
+                    $product->video = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
+                    \Log::warning('Fallback: video guardado en base64 en update', ['file' => $file->getClientOriginalName()]);
+                } catch (\Throwable $ex) {
+                    \Log::error('Fallback base64 falló en update', ['error' => $ex->getMessage()]);
+                    return response()->json(['error' => 'No se pudo subir el video: '.$e->getMessage()], 500);
+                }
             }
         }
 
