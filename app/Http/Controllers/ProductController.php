@@ -33,104 +33,108 @@ class ProductController extends Controller
     }
 
     // 🔹 Crear un nuevo producto
-    public function store(Request $request)
-    {
-        $request->validate([
-            'name'            => 'required|string|max:255',
-            'description'     => 'nullable|string',
-            'price'           => 'required|numeric',
-            'stock'           => 'required|integer',
-            'image'           => 'nullable|image|max:2048',
-            'id_user'         => 'required|integer|exists:users,id',
-            'categoria_id'    => 'nullable|integer|exists:categorias,id',
-            'subcategoria_id' => 'nullable|integer|exists:subcategorias,id',
-            'tipo'            => 'required|string|in:venta,trueque',
-            'video'           => 'nullable|file|mimes:mp4,mov,avi|max:51200', // 50MB máx
-            'status_id'       => 'nullable|integer|exists:statuses,id',
-        ]);
+    // 🔹 Crear un nuevo producto
+public function store(Request $request)
+{
+    $request->validate([
+        'name'            => 'required|string|max:255',
+        'description'     => 'nullable|string',
+        'price'           => 'required|numeric',
+        'stock'           => 'required|integer',
+        'image'           => 'nullable|image|max:2048',
+        'id_user'         => 'required|integer|exists:users,id',
+        'categoria_id'    => 'nullable|integer|exists:categorias,id',
+        'subcategoria_id' => 'nullable|integer|exists:subcategorias,id',
+        'tipo'            => 'required|string|in:venta,trueque',
+        'video'           => 'nullable|file|mimes:mp4,mov,avi|max:51200', // 50MB máx
+        'status_id'       => 'nullable|integer|exists:statuses,id',
+    ]);
 
-        $product = new Product();
-        $product->fill($request->only([
-            'name', 'description', 'price', 'stock',
-            'id_user', 'categoria_id', 'subcategoria_id', 'tipo'
-        ]));
-        $product->status_id = 1;
+    $product = new Product();
+    $product->fill($request->only([
+        'name', 'description', 'price', 'stock',
+        'id_user', 'categoria_id', 'subcategoria_id', 'tipo'
+    ]));
+    $product->status_id = 1;
 
-        // Asignación explícita para asegurar guardado si $fillable no incluye los campos
-        if ($request->has('categoria_id')) {
-            $product->categoria_id = $request->input('categoria_id');
-        }
-        if ($request->has('subcategoria_id')) {
-            $product->subcategoria_id = $request->input('subcategoria_id');
-        }
-        if ($request->has('id_user')) {
-            $product->id_user = $request->input('id_user');
-        }
+    // Asignación explícita
+    if ($request->has('categoria_id')) {
+        $product->categoria_id = $request->input('categoria_id');
+    }
+    if ($request->has('subcategoria_id')) {
+        $product->subcategoria_id = $request->input('subcategoria_id');
+    }
+    if ($request->has('id_user')) {
+        $product->id_user = $request->input('id_user');
+    }
 
-        // 🔸 Si el tipo es "trueque", el precio se pone a 0
-        if ($request->tipo === 'trueque') {
-            $product->price = 0;
-            $product->status_id = 2;
-        }
+    // 🔸 Si el tipo es "trueque", el precio se pone a 0
+    if ($request->tipo === 'trueque') {
+        $product->price = 0;
+        $product->status_id = 2;
+    }
 
-        // 🔸 Subir video a S3 si se incluye (con fallback a base64 si S3 falla)
-        if ($request->hasFile('video')) {
-            $file = $request->file('video');
-            $mimeType = $file->getClientMimeType();
+    // 🔸 Subir video a S3 si se incluye (con fallback a base64 si S3 falla)
+    if ($request->hasFile('video')) {
+        $file = $request->file('video');
+        $mimeType = $file->getClientMimeType();
 
+        try {
+            if (!$file->isValid()) {
+                \Log::error('Upload inválido', ['error' => $file->getErrorMessage() ?? 'unknown']);
+                return response()->json(['error' => 'Archivo de video inválido'], 400);
+            }
+
+            $path = $file->store('videos', 's3');
+            Storage::disk('s3')->setVisibility($path, 'public');
+            $product->video = Storage::disk('s3')->url($path);
+            \Log::info('Video subido a S3', ['path' => $path, 'url' => $product->video]);
+        } catch (\Throwable $e) {
+            \Log::error('S3 upload failed', [
+                'message' => $e->getMessage(),
+                'file' => $file->getClientOriginalName(),
+                'size' => $file->getSize()
+            ]);
             try {
-                // Validación adicional del archivo
-                if (! $file->isValid()) {
-                    \Log::error('Upload inválido', ['error' => $file->getErrorMessage() ?? 'unknown']);
-                    return response()->json(['error' => 'Archivo de video inválido'], 400);
-                }
-
-                // Intentar subir a S3
-                $path = $file->store('videos', 's3');
-                // Asegurar visibilidad pública
-                Storage::disk('s3')->setVisibility($path, 'public');
-                // URL pública
-                $product->video = Storage::disk('s3')->url($path);
-                \Log::info('Video subido a S3', ['path' => $path, 'url' => $product->video]);
-            } catch (\Throwable $e) {
-                // Log detallado y devolver error claro al front
-                \Log::error('S3 upload failed', [
-                    'message' => $e->getMessage(),
-                    'file' => $file->getClientOriginalName(),
-                    'size' => $file->getSize()
-                ]);
-                // Fallback a base64 (si quieres) o devolver error para forzar corrección
-                try {
-                    $contents = file_get_contents($file->getRealPath());
-                    $product->video = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
-                    \Log::warning('Fallback: video guardado en base64 por fallo en S3', ['file' => $file->getClientOriginalName()]);
-                } catch (\Throwable $ex) {
-                    \Log::error('Fallback base64 falló', ['error' => $ex->getMessage()]);
-                    return response()->json(['error' => 'No se pudo subir el video: '.$e->getMessage()], 500);
-                }
+                $contents = file_get_contents($file->getRealPath());
+                $product->video = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
+                \Log::warning('Fallback: video guardado en base64 por fallo en S3', ['file' => $file->getClientOriginalName()]);
+            } catch (\Throwable $ex) {
+                \Log::error('Fallback base64 falló', ['error' => $ex->getMessage()]);
+                return response()->json(['error' => 'No se pudo subir el video: ' . $e->getMessage()], 500);
             }
         }
+    }
 
-        // 🔸 Guardar imagen en base64 (sin usar disco)
-        if ($request->hasFile('image')) {
-            $file = $request->file('image');
-            $mimeType = $file->getClientMimeType();
-            $imageContents = file_get_contents($file);
-            $product->image = 'data:' . $mimeType . ';base64,' . base64_encode($imageContents);
-        }
+    // 🔸 Guardar imagen en base64 (sin usar disco)
+    if ($request->hasFile('image')) {
+        $file = $request->file('image');
+        $mimeType = $file->getClientMimeType();
+        $imageContents = file_get_contents($file);
+        $product->image = 'data:' . $mimeType . ';base64,' . base64_encode($imageContents);
+    }
 
-        $product->save();
+    $product->save();
 
-        // 🔸 Enviar correo al usuario
+    // 🔸 Enviar correo al usuario (no romper si falla SMTP)
+    try {
         if ($product->user && $product->user->email) {
             Mail::to($product->user->email)->send(new ProductoSubido($product));
         }
-
-        return response()->json([
-            'message' => 'Producto creado con éxito',
-            'product' => $product,
-        ], 201);
+    } catch (\Throwable $e) {
+        \Log::error('No se pudo enviar correo de producto subido', [
+            'product_id' => $product->id,
+            'error' => $e->getMessage(),
+        ]);
+        // NO hacemos return, para que la API siga respondiendo 201
     }
+
+    return response()->json([
+        'message' => 'Producto creado con éxito',
+        'product' => $product,
+    ], 201);
+}
+
 
     // 🔹 Mostrar producto por ID
     public function show($id)
