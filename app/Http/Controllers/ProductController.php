@@ -7,6 +7,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use App\Mail\ProductoSubido;
 use Illuminate\Support\Facades\Mail;
+use App\Models\DetalleCompra;
+use App\Models\Pedido;
+use Illuminate\Support\Facades\DB;
+use Exception;
 
 class ProductController extends Controller
 {
@@ -74,23 +78,20 @@ class ProductController extends Controller
             $file = $request->file('video');
             $mimeType = $file->getClientMimeType();
 
-            // S3 deshabilitado temporalmente — se conserva el código comentado para usar luego.
-            /*
             try {
                 // Intentar subir a S3
                 $path = $file->store('videos', 's3');
+                // Asegurar visibilidad pública
                 Storage::disk('s3')->setVisibility($path, 'public');
+                // URL pública
                 $product->video = Storage::disk('s3')->url($path);
+                \Log::info('Video subido a S3', ['path' => $path, 'url' => $product->video]);
             } catch (\Throwable $e) {
-                // Si falla S3, se registra (pero no guardamos aquí)
-                \Log::warning('S3 upload failed', ['error' => $e->getMessage()]);
+                // Si falla S3, fallback a base64 y registrar la causa
+                \Log::warning('S3 upload failed, guardando video en base64', ['error' => $e->getMessage()]);
+                $contents = file_get_contents($file->getRealPath());
+                $product->video = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
             }
-            */
-
-            // Guardar siempre como base64 en la BD (fallback permanente mientras S3 no se use)
-            $contents = file_get_contents($file->getRealPath());
-            $product->video = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
-            \Log::info('Video guardado en base64 (S3 deshabilitado)', ['size' => strlen($product->video)]);
         }
 
         // 🔸 Guardar imagen en base64 (sin usar disco)
@@ -141,32 +142,32 @@ class ProductController extends Controller
             $file = $request->file('video');
             $mimeType = $file->getClientMimeType();
 
-            // Eliminación en S3 deshabilitada (no borrar nada si guardas en base64)
-            /*
-            if ($product->video && (str_starts_with($product->video, 'http://') || str_starts_with($product->video, 'https://'))) {
+            // Intentar eliminar video previo en S3 si existía como URL pública
+            if ($product->video && !str_starts_with($product->video, 'data:') && (str_starts_with($product->video, 'http://') || str_starts_with($product->video, 'https://'))) {
                 try {
-                    $oldPath = parse_url($product->video, PHP_URL_PATH);
-                    $oldPath = ltrim($oldPath, '/');
-                    Storage::disk('s3')->delete($oldPath);
+                    $oldUrl = $product->video;
+                    $parsed = parse_url($oldUrl);
+                    $oldPath = isset($parsed['path']) ? ltrim($parsed['path'], '/') : null;
+                    if ($oldPath) {
+                        Storage::disk('s3')->delete($oldPath);
+                        \Log::info('Video anterior eliminado de S3', ['old_path' => $oldPath]);
+                    }
                 } catch (\Throwable $e) {
                     \Log::warning('No se pudo eliminar video anterior en S3', ['error' => $e->getMessage()]);
                 }
             }
-            */
 
-            // S3 upload deshabilitado — guardar en base64
-            /*
+            // Intentar subir a S3 el nuevo video
             try {
                 $path = $file->store('videos', 's3');
                 Storage::disk('s3')->setVisibility($path, 'public');
                 $product->video = Storage::disk('s3')->url($path);
+                \Log::info('Video subido a S3 en actualización', ['path' => $path, 'url' => $product->video]);
             } catch (\Throwable $e) {
-                \Log::warning('S3 upload failed on update', ['error' => $e->getMessage()]);
+                \Log::warning('S3 upload failed on update, guardando en base64', ['error' => $e->getMessage()]);
+                $contents = file_get_contents($file->getRealPath());
+                $product->video = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
             }
-            */
-            $contents = file_get_contents($file->getRealPath());
-            $product->video = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
-            \Log::info('Video actualizado y guardado en base64 (S3 deshabilitado)', ['size' => strlen($product->video)]);
         }
 
         // 🔸 Subir nueva imagen si se envía
@@ -186,22 +187,62 @@ class ProductController extends Controller
         ]);
     }
 
-    // 🔹 Eliminar producto
+    // 🔹 Eliminar producto (mejorado: borra relaciones y maneja errores)
     public function destroy($id)
     {
-        $product = Product::findOrFail($id);
+        try {
+            $product = Product::findOrFail($id);
 
-        // Eliminación en S3 deshabilitada — no intentaremos borrar nada remoto.
-        /*
-        if ($product->video) {
-            $oldPath = parse_url($product->video, PHP_URL_PATH);
-            Storage::disk('s3')->delete($oldPath);
+            DB::beginTransaction();
+
+            // 1) Eliminar detalles de compra que referencian al producto (si existen)
+            try {
+                DetalleCompra::where('producto_id', $product->id)->delete();
+            } catch (Exception $e) {
+                \Log::warning('No se pudieron eliminar DetalleCompra relacionados', ['product_id' => $product->id, 'error' => $e->getMessage()]);
+            }
+
+            // 2) Eliminar pedidos relacionados (si tu esquema tiene product_id en pedidos)
+            try {
+                Pedido::where('product_id', $product->id)->delete();
+            } catch (Exception $e) {
+                \Log::warning('No se pudieron eliminar Pedidos relacionados', ['product_id' => $product->id, 'error' => $e->getMessage()]);
+            }
+
+            // 3) Intentar eliminar video en S3 si es una URL pública
+            if ($product->video && !str_starts_with($product->video, 'data:') && (str_starts_with($product->video, 'http://') || str_starts_with($product->video, 'https://'))) {
+                try {
+                    $parsed = parse_url($product->video);
+                    $oldPath = isset($parsed['path']) ? ltrim($parsed['path'], '/') : null;
+
+                    // si la URL incluye el bucket como parte del hostname, intenta quitar el primer segmento si no encuentra el objeto
+                    if ($oldPath && Storage::disk('s3')->exists($oldPath)) {
+                        Storage::disk('s3')->delete($oldPath);
+                        \Log::info('Video eliminado de S3 (ruta directa)', ['path' => $oldPath]);
+                    } elseif ($oldPath) {
+                        // intenta con basename
+                        $basename = basename($oldPath);
+                        // buscar posibles prefijos comunes (videos/...)
+                        Storage::disk('s3')->delete("videos/{$basename}");
+                        Storage::disk('s3')->delete($basename);
+                        \Log::info('Intento de eliminación alternativa en S3', ['basename' => $basename]);
+                    }
+                } catch (Exception $e) {
+                    \Log::warning('No se pudo eliminar video en S3 al borrar producto', ['error' => $e->getMessage()]);
+                }
+            }
+
+            // 4) Finalmente eliminar el producto
+            $product->delete();
+
+            DB::commit();
+
+            return response()->json(['message' => 'Producto eliminado correctamente']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Error borrando producto', ['id' => $id, 'error' => $e->getMessage()]);
+            return response()->json(['error' => 'No se pudo eliminar el producto: ' . $e->getMessage()], 400);
         }
-        */
-
-        $product->delete();
-
-        return response()->json(['message' => 'Producto eliminado correctamente']);
     }
 
     // 🔹 Obtener productos por usuario
