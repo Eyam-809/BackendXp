@@ -16,6 +16,9 @@ RUN apt-get update && apt-get install -y \
 # Habilitar mod_rewrite para Apache (necesario para Laravel)
 RUN a2enmod rewrite
 
+RUN echo "upload_max_filesize=70M\npost_max_size=80M\nmemory_limit=512M\nmax_execution_time=300" > /usr/local/etc/php/conf.d/uploads.ini
+
+
 # Instalar Composer globalmente
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
